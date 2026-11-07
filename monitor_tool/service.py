@@ -36,10 +36,13 @@ class Plan:
     demo: bool
     tone: dict | None = None
     notes: list[str] = field(default_factory=list)
+    reference: dict | None = None
+    expected_target: dict | None = None
+    color: dict | None = None
 
     @property
     def has_changes(self):
-        return bool(self.changes or self.tone)
+        return bool(self.changes or self.tone or self.color)
 
     def public(self):
         return {"monitor": self.monitor, "changes": [asdict(c) for c in self.changes],
@@ -75,7 +78,7 @@ def load_profile(path):
         if path.stat().st_size > 1_000_000:
             raise MonitorError("Backup excede o tamanho permitido.")
         data = json.loads(path.read_text(encoding="utf-8-sig"))
-        if (not isinstance(data, dict) or type(data.get("schema")) is not int or data["schema"] not in (1, 2)
+        if (not isinstance(data, dict) or type(data.get("schema")) is not int or data["schema"] not in (1, 2, 3)
                 or type(data.get("demo")) is not bool
                 or not isinstance(data.get("monitor"), dict)
                 or not isinstance(data["monitor"].get("identity"), str)
@@ -86,12 +89,21 @@ def load_profile(path):
             if name not in FEATURES or not isinstance(value, dict):
                 raise MonitorError("Backup contém controle não permitido.")
             Value(value.get("current"), value.get("maximum"))
-        if data["schema"] == 2:
+        if data["schema"] == 2 or "tone_curve" in data and data["schema"] == 3:
             validate_ramp(data.get("tone_curve"))
         elif "tone_curve" in data:
             raise MonitorError("Backup de curva SDR exige schema 2.")
         if not data["values"] and "tone_curve" not in data:
             raise MonitorError("Backup vazio: nenhum controle ou curva SDR.")
+        if data["schema"] == 3:
+            color = data.get("color_preset")
+            if (not isinstance(color, dict) or type(color.get("current")) is not int
+                    or not isinstance(color.get("supported"), list)
+                    or any(type(v) is not int or not 1 <= v <= 0x0D for v in color["supported"])
+                    or color["current"] not in color["supported"]):
+                raise MonitorError("Backup contém modo de cor inválido.")
+        elif "color_preset" in data:
+            raise MonitorError("Backup com modo de cor exige schema 3.")
         return data
     except (OSError, ValueError, TypeError) as exc:
         raise MonitorError(f"Não foi possível ler o backup: {exc}") from exc
@@ -145,7 +157,7 @@ class Service:
             raise MonitorError(f"Monitor '{monitor_id}' ausente ou ambíguo. Atualize a lista.")
         return matches[0]
 
-    def snapshot(self, monitor, include_tone=False):
+    def snapshot(self, monitor, include_tone=False, include_color=False):
         values, errors = {}, {}
         for name in FEATURES:
             try:
@@ -161,18 +173,24 @@ class Service:
                 profile["schema"] = 2
             except MonitorError as exc:
                 profile["tone_unavailable"] = str(exc)
+        if include_color:
+            try:
+                profile["color_preset"] = self.backend.read_color(monitor)
+                profile["schema"] = 3
+            except MonitorError as exc:
+                profile["color_unavailable"] = str(exc)
         return profile
 
-    def inspect(self):
+    def inspect(self, include_tone=False):
         with self.session() as monitors:
-            profiles = [self.snapshot(m) for m in monitors]
+            profiles = [self.snapshot(m, include_tone, include_color=True) for m in monitors]
             return {"demo": self.backend.demo, "monitors": profiles,
                     "warnings": list(getattr(self.backend, "warnings", []))}
 
     def backup(self, monitor_id, path=None):
         with self.session() as monitors:
             monitor = self.find(monitors, monitor_id)
-            profile = self.snapshot(monitor, include_tone=True)
+            profile = self.snapshot(monitor, include_tone=True, include_color=True)
             if not profile["values"] and "tone_curve" not in profile:
                 raise MonitorError("Nenhum dos cinco controles pôde ser lido; backup não criado.")
             return save_json(path or self.new_backup_path(monitor.id), profile)
@@ -208,6 +226,78 @@ class Service:
                 except MonitorError as exc:
                     skipped[name] = str(exc)
             return Plan(target.public(), changes, skipped, self.backend.demo)
+
+    def plan_match(self, source_id, target_id, mode="exact", include_tone=True, color_mode="auto"):
+        """Copia os controles/curva da referência, com guarda de ambas as telas."""
+        if source_id == target_id or mode not in ("exact", "relative") or color_mode not in ("auto", "source", "user1", "user2"):
+            raise MonitorError("Escolha monitores diferentes e modo exact ou relative.")
+        with self.session() as monitors:
+            source, target = self.find(monitors, source_id), self.find(monitors, target_id)
+            self.check_target(source)
+            self.check_target(target)
+            a = self.snapshot(source, include_tone, include_color=True)
+            b = self.snapshot(target, include_tone, include_color=True)
+            changes, skipped, expected = [], {}, {}
+            for name in FEATURES:
+                if name not in a["values"] or name not in b["values"]:
+                    skipped[name] = "Controle indisponível na origem ou no destino."
+                    continue
+                source_value, target_value = a["values"][name], b["values"][name]
+                value = source_value["current"]
+                if mode == "relative":
+                    value = (value * target_value["maximum"] + source_value["maximum"] // 2) // source_value["maximum"]
+                if value > target_value["maximum"]:
+                    skipped[name] = "O valor do IPS excede o máximo do destino; use o modo proporcional."
+                    continue
+                expected[name] = {"current": value, "maximum": target_value["maximum"]}
+                if value != target_value["current"]:
+                    changes.append(Change(name, target_value["current"], value, target_value["maximum"]))
+            tone = None
+            if include_tone:
+                for profile in (a, b):
+                    if "tone_curve" not in profile:
+                        raise MonitorError("Não foi possível copiar a curva SDR: " +
+                                           profile.get("tone_unavailable", "curva indisponível") +
+                                           " Desmarque a curva para copiar somente controles DDC.")
+                if not ramps_match(b["tone_curve"], a["tone_curve"], tolerance=0):
+                    tone = {"before": b["tone_curve"], "after": a["tone_curve"],
+                            "label": "Copiar curva SDR atual do IPS"}
+            if not expected and not include_tone:
+                raise MonitorError("Nenhum controle em comum pôde ser lido.")
+            notes = ["Cópia dos mesmos valores nativos." if mode == "exact" else "Cópia proporcional aos máximos.",
+                     "Apenas o destino será ajustado. A aparência pode variar entre IPS e VA."]
+            plan = Plan(target.public(), changes, skipped, self.backend.demo, tone, notes)
+            plan.reference = a
+            plan.expected_target = {"values": expected}
+            if "color_preset" in a and "color_preset" in b:
+                desired = a["color_preset"]["current"]
+                rgb_differs = any(name in expected and b["values"][name]["current"] != expected[name]["current"]
+                                  for name in ("red", "green", "blue"))
+                # Presets de temperatura podem ter ganhos fixos de fábrica distintos.
+                # User 1 é explicitamente anunciado nas capacidades antes de habilitar RGB.
+                if color_mode in ("user1", "user2"):
+                    desired = {"user1": 0x0B, "user2": 0x0C}[color_mode]
+                elif color_mode == "auto" and desired not in (0x0B, 0x0C, 0x0D):
+                    current_mode = b["color_preset"]["current"]
+                    if current_mode in (0x0B, 0x0C, 0x0D):
+                        desired = current_mode
+                    elif rgb_differs:
+                        # User 2 foi verificado no VA local; nunca enviar se não anunciado.
+                        desired = next((v for v in (0x0C, 0x0B) if v in b["color_preset"]["supported"]), desired)
+                if desired != a["color_preset"]["current"]:
+                    notes.append(f"Destino em modo Usuário (0x{desired:02X}) para permitir RGB editável; "
+                                 "o preset nominal pode diferir do IPS, mas os ganhos copiados serão verificados.")
+                if desired in b["color_preset"]["supported"]:
+                    plan.expected_target["color_preset"] = desired
+                    if desired != b["color_preset"]["current"]:
+                        plan.color = {"before": b["color_preset"]["current"], "after": desired}
+                else:
+                    skipped["color_preset"] = "Modo de cor da origem não suportado no destino."
+            else:
+                skipped["color_preset"] = "Modo de cor não informado por uma das telas."
+            if include_tone:
+                plan.expected_target["tone_curve"] = a["tone_curve"]
+            return plan
 
     def plan_set(self, target_id, values):
         if not values or any(n not in FEATURES or type(v) is not int for n, v in values.items()):
@@ -249,7 +339,18 @@ class Service:
                             "label": "Restaurar curva SDR do backup"}
             else:
                 notes.append("Este backup contém somente DDC/CI; não altera a curva de tons da GPU.")
-            return Plan(target.public(), changes, {}, self.backend.demo, tone, notes)
+            plan = Plan(target.public(), changes, {}, self.backend.demo, tone, notes)
+            if "color_preset" in profile:
+                color = self.backend.read_color(target)
+                desired = profile["color_preset"]["current"]
+                if desired not in color["supported"]:
+                    raise MonitorError("Modo de cor do backup não é mais suportado.")
+                if color["current"] != desired:
+                    plan.color = {"before": color["current"], "after": desired}
+                plan.expected_target = {"values": profile["values"], "color_preset": desired}
+                if "tone_curve" in profile:
+                    plan.expected_target["tone_curve"] = profile["tone_curve"]
+            return plan
 
     def plan_oled(self, target_id, panel, strength="balanced", tone_curve=False):
         percent, _ = parameters(panel, strength)
@@ -291,7 +392,28 @@ class Service:
             self.check_target(target)
             if target.identity != plan.monitor["identity"]:
                 raise MonitorError("Monitor mudou desde a prévia. Atualize a comparação.")
-            profile = self.snapshot(target, include_tone=True)
+            profile = self.snapshot(target, include_tone=True, include_color=True)
+            if plan.reference:
+                ref = self.find(monitors, plan.reference["monitor"]["id"])
+                if ref.identity != plan.reference["monitor"]["identity"]:
+                    raise MonitorError("A referência mudou. Prepare novamente.")
+                actual_ref = self.snapshot(ref, "tone_curve" in plan.reference, "color_preset" in plan.reference)
+                if (actual_ref["values"] != plan.reference["values"]
+                        or actual_ref.get("tone_curve") != plan.reference.get("tone_curve")
+                        or actual_ref.get("color_preset") != plan.reference.get("color_preset")):
+                    raise MonitorError("Os valores do IPS mudaram desde a prévia. Prepare novamente.")
+            if plan.expected_target:
+                # Controles já iguais também participam da guarda; podem mudar depois da prévia.
+                changed = {c.feature for c in plan.changes}
+                for name, expected in plan.expected_target["values"].items():
+                    if name not in changed and profile["values"].get(name) != expected:
+                        raise MonitorError("O destino mudou desde a prévia. Prepare novamente.")
+                if "tone_curve" in plan.expected_target and not plan.tone:
+                    if profile.get("tone_curve") != plan.expected_target["tone_curve"]:
+                        raise MonitorError("A curva do destino mudou desde a prévia. Prepare novamente.")
+                if "color_preset" in plan.expected_target and not plan.color:
+                    if profile.get("color_preset", {}).get("current") != plan.expected_target["color_preset"]:
+                        raise MonitorError("O modo de cor mudou desde a prévia. Prepare novamente.")
             seen = set()
             for change in plan.changes:
                 if change.feature not in FEATURES or change.feature in seen:
@@ -309,12 +431,37 @@ class Service:
                     raise MonitorError(profile.get("tone_unavailable", "Curva SDR indisponível."))
                 if not ramps_match(profile["tone_curve"], plan.tone["before"], tolerance=0):
                     raise MonitorError("Curva SDR mudou desde a prévia. Prepare novamente.")
+            if plan.color:
+                current_color = profile.get("color_preset", {})
+                if (current_color.get("current") != plan.color["before"]
+                        or plan.color["after"] not in current_color.get("supported", [])):
+                    raise MonitorError("O modo de cor mudou ou não é suportado. Prepare novamente.")
             if not plan.has_changes:
                 return {"ok": True, "backup": None, "applied": [], "failed": {}}
             # Salvar e confirmar o fechamento do arquivo antes da primeira escrita DDC.
             backup = save_json(self.new_backup_path(target.id), profile)
             applied, failed = [], {}
-            for change in plan.changes:
+            if plan.color:
+                try:
+                    self.backend.write_color(target, plan.color["after"])
+                    if self.backend.read_color(target)["current"] != plan.color["after"]:
+                        raise MonitorError("Monitor não confirmou a mudança do modo de cor.")
+                    applied.append("color_preset")
+                except Exception as exc:
+                    failed["color_preset"] = str(exc)
+            writes = list(plan.changes)
+            if plan.color and not failed:
+                # Presets podem mudar outros controles, inclusive os antes iguais.
+                writes = []
+                for name, expected in plan.expected_target["values"].items():
+                    try:
+                        current = self.backend.read(target, name)
+                        if current.current != expected["current"]:
+                            writes.append(Change(name, current.current, expected["current"], expected["maximum"]))
+                    except MonitorError as exc:
+                        failed[name] = str(exc)
+                        break
+            for change in writes if not failed else []:
                 try:
                     self.backend.write(target, change.feature, change.after)
                     actual = self.backend.read(target, change.feature)
@@ -328,7 +475,7 @@ class Service:
                     break
             if not failed:
                 # Uma escrita posterior pode alterar um controle já verificado (presets RGB).
-                for change in plan.changes:
+                for change in writes:
                     try:
                         actual = self.backend.read(target, change.feature)
                         if actual != Value(change.after, change.maximum):
@@ -345,7 +492,23 @@ class Service:
                     applied.append("tone_curve")
                 except Exception as exc:
                     failed["tone_curve"] = str(exc)
-            intended = [c.feature for c in plan.changes] + (["tone_curve"] if plan.tone else [])
+            if plan.expected_target and not failed:
+                final = self.snapshot(target, "tone_curve" in plan.expected_target,
+                                      "color_preset" in plan.expected_target)
+                for name, expected in plan.expected_target["values"].items():
+                    if final["values"].get(name) != expected:
+                        failed[name] = "O valor final não corresponde ao IPS. Confira o modo de imagem."
+                        if name in applied:
+                            applied.remove(name)
+                if "tone_curve" in plan.expected_target:
+                    if "tone_curve" not in final or not ramps_match(final["tone_curve"], plan.expected_target["tone_curve"]):
+                        failed["tone_curve"] = "A curva final não corresponde à referência."
+                        if "tone_curve" in applied:
+                            applied.remove("tone_curve")
+                if "color_preset" in plan.expected_target:
+                    if final.get("color_preset", {}).get("current") != plan.expected_target["color_preset"]:
+                        failed["color_preset"] = "Modo de cor final difere da referência."
+            intended = [c.feature for c in plan.changes] + (["tone_curve"] if plan.tone else []) + (["color_preset"] if plan.color else [])
             return {"ok": not failed, "backup": str(backup), "applied": applied,
                     "failed": failed, "not_attempted": [name for name in intended
                     if name not in applied and name not in failed]}

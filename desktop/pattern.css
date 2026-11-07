@@ -1,0 +1,34 @@
+main {
+  max-width: 1500px;
+  padding-top: 40px;
+}
+section {
+  margin-top: 42px;
+}
+.swatches {
+  display: flex;
+}
+.swatch {
+  flex: 1;
+  min-width: 0;
+}
+.color {
+  height: 90px;
+}
+.caption {
+  text-align: center;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  margin-top: 10px;
+}
+#grayscale {
+  display: flex;
+  height: 90px;
+}
+#grayscale span {
+  flex: 1;
+}
+body {
+  background: #161616;
+}

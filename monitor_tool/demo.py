@@ -9,6 +9,8 @@ class DemoBackend:
 
     def __init__(self):
         self.hdr = False
+        self.colors = {"demo-ips": {"current": 5, "supported": [5, 8, 11, 12]},
+                       "demo-va": {"current": 8, "supported": [5, 8, 11, 12]}}
         self.tones = {name: [[i * 257 for i in range(256)] for _ in range(3)]
                       for name in ("demo-ips", "demo-va")}
         self.monitors = [Monitor("demo-ips", "IPS de demonstração", "DEMO 1", "demo:ips"),
@@ -42,3 +44,12 @@ class DemoBackend:
     def write_tone(self, monitor, values):
         self.read_tone(monitor)  # Confere SDR também na escrita.
         self.tones[monitor.id] = [channel.copy() for channel in values]
+
+    def read_color(self, monitor):
+        return {"current": self.colors[monitor.id]["current"],
+                "supported": self.colors[monitor.id]["supported"].copy()}
+
+    def write_color(self, monitor, value):
+        if value not in self.colors[monitor.id]["supported"]:
+            raise MonitorError("Modo de cor não suportado.")
+        self.colors[monitor.id]["current"] = value

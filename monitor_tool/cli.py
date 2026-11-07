@@ -2,7 +2,7 @@ import argparse
 import json
 import sys
 
-from .models import FEATURES, MonitorError
+from .models import FEATURES, CONTROL_LABELS, MonitorError
 from .service import Service
 from .looks import STRENGTHS
 
@@ -12,7 +12,17 @@ def parser():
     p.add_argument("--demo", action="store_true", help="Simula dois monitores; não acessa hardware.")
     p.add_argument("--backup-dir", help="Pasta para backups automáticos.")
     sub = p.add_subparsers(dest="command")
-    sub.add_parser("gui", help="Abre a janela (padrão quando nenhum comando é informado).")
+    sub.add_parser("gui", help="Abre a janela Electron (padrão).")
+    sub.add_parser("gui-tk", help="Abre a janela Tkinter anterior (compatibilidade).")
+    match = sub.add_parser("match", help="Iguala o destino à referência: valores nativos e curva SDR.")
+    match.add_argument("--source", required=True)
+    match.add_argument("--target", required=True)
+    match.add_argument("--mode", choices=["exact", "relative"], default="exact")
+    match.add_argument("--no-tone", action="store_true", help="Copia somente DDC, sem curva GPU.")
+    match.add_argument("--color-mode", choices=["auto", "source", "user1", "user2"], default="auto",
+                       help="auto usa modo Usuário para RGB editável quando necessário; source copia o preset literal.")
+    match.add_argument("--yes", action="store_true")
+    match.add_argument("--dry-run", action="store_true")
     ls = sub.add_parser("list", help="Lista monitores e lê os cinco controles permitidos.")
     ls.add_argument("--json", action="store_true", help="Saída estruturada.")
     backup = sub.add_parser("backup", help="Salva valores atuais em JSON.")
@@ -68,10 +78,12 @@ def print_plan(plan):
         print(f"  {FEATURES[change.feature][1]}: {change.before} -> {change.after} / {change.maximum}")
     if plan.tone:
         print(f"  Curva SDR: {plan.tone['label']}")
+    if plan.color:
+        print(f"  Modo de cor: 0x{plan.color['before']:02X} -> 0x{plan.color['after']:02X}")
     if not plan.has_changes:
         print("Nenhuma alteração aplicável.")
     for name, reason in plan.skipped.items():
-        print(f"  Ignorado — {FEATURES[name][1]}: {reason}")
+        print(f"  Ignorado — {CONTROL_LABELS.get(name, name)}: {reason}")
     for note in plan.notes:
         print(f"  Nota: {note}")
 
@@ -88,6 +100,9 @@ def main(argv=None):
         service = Service(backend, args.backup_dir)
         command = args.command or "gui"
         if command == "gui":
+            from .desktop import launch
+            return launch(args.demo, args.backup_dir)
+        if command == "gui-tk":
             from .gui import launch
             launch(service)
             return 0
@@ -121,7 +136,9 @@ def main(argv=None):
         if command == "backup":
             print(service.backup(args.monitor, args.output))
             return 0
-        if command in ("compare", "apply"):
+        if command == "match":
+            plan = service.plan_match(args.source, args.target, args.mode, not args.no_tone, args.color_mode)
+        elif command in ("compare", "apply"):
             plan = service.compare(args.source, args.target, args.features)
         elif command == "set":
             plan = service.plan_set(args.monitor, parse_values(args.values))

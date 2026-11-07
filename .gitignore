@@ -5,3 +5,5 @@ backups/
 output/
 .taste-skill/
 monitor_roles.json
+node_modules/
+*.log

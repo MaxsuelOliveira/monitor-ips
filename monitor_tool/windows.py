@@ -3,6 +3,7 @@ import ctypes as C
 from ctypes import wintypes as W
 from contextlib import contextmanager
 import hashlib
+import re
 import sys
 import time
 
@@ -44,6 +45,8 @@ class WindowsBackend:
             (self.dx.GetVCPFeatureAndVCPFeatureReply,
              [W.HANDLE, W.BYTE, C.POINTER(C.c_int), C.POINTER(W.DWORD), C.POINTER(W.DWORD)]),
             (self.dx.SetVCPFeature, [W.HANDLE, W.BYTE, W.DWORD]),
+            (self.dx.GetCapabilitiesStringLength, [W.HANDLE, C.POINTER(W.DWORD)]),
+            (self.dx.CapabilitiesRequestAndCapabilitiesReply, [W.HANDLE, C.c_void_p, W.DWORD]),
         ]
         for function, args in signatures:
             function.argtypes = args
@@ -144,3 +147,30 @@ class WindowsBackend:
     def write_tone(self, monitor, values):
         from .tone import WindowsTone
         WindowsTone().write(monitor, values)
+
+    def read_color(self, monitor):
+        length = W.DWORD()
+        if not self.dx.GetCapabilitiesStringLength(monitor.handle, C.byref(length)) or not 0 < length.value < 100000:
+            raise MonitorError("Monitor não informou os modos de cor disponíveis.")
+        data = C.create_string_buffer(length.value)
+        if not self.dx.CapabilitiesRequestAndCapabilitiesReply(monitor.handle, data, length):
+            raise self.error("Consultar modos de cor")
+        match = re.search(r"(?:^|[\s(])14\s*\(([^()]*)\)", data.value.decode("ascii", "replace"), re.I)
+        if not match:
+            raise MonitorError("Monitor não anunciou modos de cor VCP 0x14.")
+        supported = sorted({int(value, 16) for value in match[1].split()
+                            if re.fullmatch(r"[0-9a-fA-F]{2}", value) and 1 <= int(value, 16) <= 0x0D})
+        current, maximum, kind = W.DWORD(), W.DWORD(), C.c_int()
+        if not self.dx.GetVCPFeatureAndVCPFeatureReply(monitor.handle, 0x14, C.byref(kind), C.byref(current), C.byref(maximum)):
+            raise self.error("Ler modo de cor")
+        if current.value not in supported:
+            raise MonitorError("Modo atual não consta nas capacidades anunciadas. Cópia bloqueada.")
+        return {"current": current.value, "supported": supported}
+
+    def write_color(self, monitor, value):
+        state = self.read_color(monitor)
+        if type(value) is not int or value not in state["supported"]:
+            raise MonitorError("Modo de cor não suportado pelo destino.")
+        if not self.dx.SetVCPFeature(monitor.handle, 0x14, value):
+            raise self.error("Ajustar modo de cor")
+        time.sleep(0.3)

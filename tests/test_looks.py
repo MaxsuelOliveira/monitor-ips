@@ -49,7 +49,7 @@ class LookTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertIn("tone_curve", result["applied"])
         saved = load_profile(result["backup"])
-        self.assertEqual(saved["schema"], 2)
+        self.assertEqual(saved["schema"], 3)
         self.assertEqual(saved["tone_curve"], original_tone)
         self.assertEqual(other_tone, self.backend.read_tone(self.backend.monitors[1]))
         self.assertEqual(before["contrast"], self.backend.values["demo-ips"]["contrast"])
@@ -132,6 +132,7 @@ class LookTests(unittest.TestCase):
         with self.assertRaises(MonitorError):
             load_profile(bad)
         data.pop("tone_curve")
+        data.pop("color_preset", None)
         data["schema"] = 1
         old = self.folder / "old.json"
         old.write_text(json.dumps(data), encoding="utf-8")

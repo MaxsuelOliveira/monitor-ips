@@ -1,261 +1,180 @@
 # Monitor IPS
 
-Ferramenta local para Windows, feita em Python, com janela Tkinter e CLI. Lê os
-controles de imagem do IPS e do VA, compara os valores, prepara uma cópia
-proporcional, permite ajustes manuais e restaura os valores salvos em backup.
-Inclui **Sabor OLED**, um perfil visual com ajustes próprios para IPS e VA,
-intensidades Suave/Equilibrado/Cinema e uma curva SDR opcional para meios-tons mais
-profundos. É uma aproximação estética: não transforma o painel em OLED e não é
-calibração instrumental.
-Não precisa de ControlMyMonitor, PowerShell auxiliar, conta ou serviço externo.
+Aplicativo Windows com **Electron + HTML/CSS** e backend Python local para
+aproximar as configurações do VA às do IPS. A janela principal agora tem três
+seções: **Sincronizar**, **Ajuste fino** e **Backups**. O CLI continua independente
+de Node/Electron. O perfil OLED anterior não aparece no novo fluxo principal.
 
-## Abrir a janela
+## Abrir
 
-Requisitos: Windows 10/11, Python 3.10+ com Tkinter (incluído no instalador padrão
-do python.org), monitores conectados e DDC/CI habilitado no menu físico deles.
-Não há pacotes para instalar com pip. A validação local usou Python 3.14.
+Dê dois cliques em **abrir.cmd** na pasta `F:\Jobs\SaaS\monitor-ips`.
+Feche uma janela Tkinter antiga e abra pelo atalho para carregar a interface nova.
+O Electron já foi instalado e validado nesta máquina.
 
-Na pasta `F:\Jobs\SaaS\monitor-ips`, dê dois cliques em **abrir.cmd**, ou execute:
+Requisitos: Windows 10/11, Python 3.10+ no PATH, DDC/CI habilitado nos monitores.
+Para instalar a interface: Node.js 22.12+ com npm e internet na primeira preparação.
+Depois disso, a aplicação funciona localmente, sem conta, CDN ou servidor HTTP.
+Não há pacotes Python externos para instalar.
 
 ```powershell
+npm ci
+npm run prepare:desktop
+npm start
+
+# Alternativas
 python monitor_ips.py gui
-```
+python monitor_ips.py
 
-Para experimentar sem acessar os monitores reais:
-
-```powershell
+# Demonstração, sem hardware
+npm run demo
 python monitor_ips.py --demo gui
 ```
 
-1. Clique em **Atualizar monitores**. Os identificadores são exibidos junto ao nome
-   e à conexão `DISPLAY1`, `DISPLAY2` etc. Use Configurações → Sistema → Tela →
-   Identificar, no Windows, para reconhecer as telas. O programa não detecta IPS/VA.
-2. Para copiar, selecione seu IPS como origem e seu VA como destino. Para perfis e
-   restauração, o destino pode ser qualquer uma das telas. Sem classificação local,
-   a pré-seleção é apenas a ordem das telas. O arquivo opcional `monitor_roles.json`
-   mapeia IDs para `ips`/`va`, é ignorado pelo Git e permite mostrar o tipo nos seletores.
-   Nesta máquina, DISPLAY2 foi identificado pelo usuário como IPS e DISPLAY1 como VA.
-3. Use **Backup do destino** para guardar uma cópia manual. Antes de qualquer
-   aplicação o programa também cria um backup automático.
-4. Marque os controles desejados e clique em **Comparar / preparar cópia**. A tabela
-   mostra a prévia e os controles ignorados por falha/indisponibilidade de leitura.
-5. Clique em **Aplicar prévia** e confira a confirmação. Somente o destino recebe
-   escritas. A origem é lida. Se os valores do destino tiverem mudado desde a prévia,
-   a operação é bloqueada e você precisa preparar novamente.
-6. Para ajuste fino, preencha valores nativos nos campos, mantenha marcados os
-   controles desejados e clique em **Preparar ajustes manuais**, depois em Aplicar.
-   Campos vazios são ignorados nesse fluxo.
-7. Para desfazer, selecione o mesmo destino, clique em **Restaurar backup**, escolha
-   o JSON e revise a prévia. Clique em Aplicar. A restauração também salva um backup
-   do estado anterior à restauração.
+A janela Tkinter anterior continua em `python monitor_ips.py gui-tk`.
+Os comandos legados `compare`, `apply`, `pattern` e `oled` foram preservados.
 
-A janela possui rolagem para telas menores ou escala de texto alta. Leituras DDC
-rodam em uma thread de trabalho; aguarde a operação terminar para fechar a janela.
+## Igualar o VA ao IPS
 
-## Sabor OLED
+1. Em Sincronizar, escolha o IPS como **Referência** e o VA como **Destino**.
+2. Confira a tabela: referência, destino atual, depois da cópia e comparação.
+3. **Mesmos valores** copia os números nativos. **Proporcional ao máximo**
+   copia proporções quando as escalas forem diferentes.
+4. A curva SDR opcional copia a curva atual do IPS, sem criar outro perfil.
+   Se HDR ou o driver impedir a leitura, desmarque para copiar apenas DDC.
+5. Clique em **Igualar VA ao IPS**, revise e confirme. Um backup completo dos
+   campos legíveis do destino é salvo antes da primeira escrita.
 
-Na janela, selecione o **destino**, confira **Painel do destino**, escolha a
-intensidade e clique em **Preparar Sabor OLED**, depois em **Aplicar prévia**.
-A opção **Curva SDR: substituir curva GPU atual** vem marcada na janela e é
-explicitamente listada na confirmação. Desmarque para ajustar somente a luz de fundo.
-A origem não participa desse perfil: aplique separadamente em cada tela.
+O IPS é apenas lido. Se o IPS ou o destino mudarem depois da prévia, a operação
+é bloqueada. Após aplicar, o serviço relê e verifica os controles compatíveis.
 
-| Intensidade | Teto de brilho IPS | Teto de brilho VA | Curva de meios-tons |
-| --- | --- | --- | --- |
-| Suave | 28% do máximo | 22% do máximo | Leve |
-| Equilibrado (padrão) | 22% do máximo | 16% do máximo | Moderada |
-| Cinema | 16% do máximo | 12% do máximo | Mais forte |
+Nesta máquina: **DISPLAY2 / VLK2730 = IPS** e **DISPLAY1 / LHCFFFF = VA**,
+conforme identificação do usuário. O arquivo local `monitor_roles.json` mapeia IDs
+para tipos e é ignorado pelo Git. Não há detecção automática da tecnologia do painel.
 
-Esses números são pontos de partida heurísticos, não nits nem medições de contraste.
-O perfil não aumenta um brilho que já esteja abaixo do teto. Preserva os controles
-DDC de contraste e RGB. A curva GPU é absoluta e neutra nos três canais: substitui
-a curva atual, sem multiplicar reaplicações ou alterar arquivos/perfis ICC. Se havia
-uma curva de calibração carregada por outro software, ela será substituída até
-restaurar ou o software/Windows carregá-la novamente.
+### Modo de cor e RGB bloqueado
 
-As curvas preservam os códigos de entrada 0..8 e 240..255 e são monotônicas;
-escurecem os meios-tons. Isso evita clipping introduzido pelo algoritmo nesses
-extremos, mas não garante distinção física de todos os degraus no seu painel.
-O ajuste VA é mais suave que o IPS para reduzir o risco de perder detalhes escuros.
+Os presets de fábrica dos dois modelos possuem ganhos RGB diferentes. O diagnóstico
+real mostrou que o VA confirmava o comando DDC, mas ignorava o novo ganho RGB.
+No VA local, **Usuário 2 (0x0C)** permite editar RGB. Presets 0x05, 0x08 e Usuário 1
+não aceitaram os ganhos individuais.
 
-Use **Teste visual no destino** para abrir sombras, realces e gradiente neutro na
-tela selecionada. **Esc** ou **Fechar** encerra apenas essa janela. Olhe de frente,
-na luz em que usa o monitor. A tela ajuda no ajuste visual, sem medir ou certificar cor.
+O automático consulta as capacidades anunciadas e pode usar um modo Usuário
+para copiar os ganhos. Prefere Usuário 2 quando disponível e mantém um modo Usuário
+já ativo. O preset nominal pode diferir do IPS, mas os controles copiados são
+verificados. A prévia e a confirmação mostram essa mudança; presets não anunciados
+não são enviados. Alterar um preset pode mudar outros controles: o serviço relê e
+aplica novamente os valores desejados.
 
-Exemplos CLI:
+Em **Opções do modo de cor**, escolha automático, mesmo preset literal da
+referência, Usuário 1 ou Usuário 2. O preset literal pode bloquear RGB e provocar
+falha de verificação. A aplicação informa essa falha, sem declarar sucesso.
 
-```powershell
-# Prévia com curva GPU (HDR precisa estar desligado)
-python monitor_ips.py oled --monitor ID_IPS --panel ips --strength balanced --tone-curve --dry-run
+## Ajuste fino e backups
 
-# Aplicar, com confirmação interativa e backup automático
-python monitor_ips.py oled --monitor ID_IPS --panel ips --strength balanced --tone-curve
-python monitor_ips.py oled --monitor ID_VA --panel va --strength balanced --tone-curve
+- **Ajuste fino:** brilho, contraste e ganhos RGB em unidades nativas, dentro dos
+  máximos mostrados. Revise antes de aplicar. Também há backup automático.
+- **Teste visual:** sombras, realces e escala de cinza no destino. Esc ou Fechar
+  encerra somente essa janela.
+- **Backups:** crie uma cópia, abra a pasta ou escolha um JSON do mesmo monitor
+  para restaurar. A restauração também tem prévia, confirmação e backup anterior.
+- **Histórico:** resultados, falhas e caminhos dos backups da sessão.
 
-# Apenas luz de fundo, sem mexer na curva GPU
-python monitor_ips.py oled --monitor ID_VA --panel va --strength subtle
+Padrão: `%LOCALAPPDATA%\MonitorIPS\backups`; demo:
+`%LOCALAPPDATA%\MonitorIPS\demo-backups`. Use `--backup-dir` para outra pasta.
+Arquivos nunca são sobrescritos e são publicados completos antes de escrever.
+A publicação usa hard link: prefira uma pasta local NTFS. Falha de disco bloqueia o ajuste.
 
-# Padrão visual na tela escolhida
-python monitor_ips.py pattern --monitor ID_IPS
-```
+| Schema | Conteúdo restaurável |
+| --- | --- |
+| 1 | Brilho, contraste e ganhos RGB legíveis |
+| 2 | Controles DDC e curva GPU SDR de 3 × 256 valores |
+| 3 | Controles DDC, modo de cor e, quando legível, curva GPU SDR |
 
-Para desfazer **brilho e curva**, use Restaurar com o backup schema 2 criado antes
-do perfil. Backups antigos schema 1 só restauram controles DDC e a prévia avisa isso.
-O caminho do backup é apresentado após cada aplicação. Backups reais/simulados
-continuam isolados. Se a curva não puder ser confirmada após a escrita, a operação
-informa falha e fornece o backup; não relata sucesso apenas porque a API retornou TRUE.
+Backups antigos sem modo/curva não restauram esses campos. Schema 3 restaura o
+preset antes dos ganhos e verifica os efeitos sobre outros controles.
+Restaurar recupera o arquivo escolhido; não executa reset de fábrica, nem altera
+firmware ou arquivos ICC. Identidade, máximos e modo real/demo precisam corresponder.
+Trocar porta, dock ou modo de imagem pode exigir nova leitura. Não force outro monitor.
+Evite ajustar pelo OSD ou por outro aplicativo durante a operação.
 
-**Limitações da curva:** requer SDR confirmado; HDR/Advanced Color ativo, topologia
-ambígua ou impossibilidade de verificar o modo bloqueiam a curva antes de aplicar
-o plano. O Windows, jogos ou aplicativos de calibração podem substituí-la depois.
-Não há serviço de reaplicação, tarefa agendada ou watcher. A curva pode ser perdida
-ao reiniciar, mudar resolução/conexões ou abrir certos jogos. Reaplique manualmente.
-Essas limitações são descritas pela [Microsoft na documentação de SetDeviceGammaRamp](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-setdevicegammaramp).
-
-## Linha de comando
-
-Execute os comandos dentro da pasta do projeto. As opções globais `--demo` e
-`--backup-dir` vêm **antes** do subcomando. Os exemplos com `ID_IPS` e `ID_VA` são
-marcadores: substitua pelos IDs apresentados por `list`.
+## CLI
 
 ```powershell
-# Descobrir monitores e valores atuais
 python monitor_ips.py list
 python monitor_ips.py list --json
 
-# Backups manuais: o arquivo de saída precisa ser novo
-python monitor_ips.py backup --monitor ID_IPS --output backups\ips-original.json
+# Cópia atual do IPS DISPLAY2 para VA DISPLAY1
+python monitor_ips.py match --source 0581ae7f4b073cc4 --target 43ecb36d2d9651ca --dry-run
+python monitor_ips.py match --source 0581ae7f4b073cc4 --target 43ecb36d2d9651ca
+
+# Alternativas explícitas (substitua ID_IPS e ID_VA)
+python monitor_ips.py match --source ID_IPS --target ID_VA --mode relative --no-tone
+python monitor_ips.py match --source ID_IPS --target ID_VA --color-mode source --dry-run
+python monitor_ips.py match --source ID_IPS --target ID_VA --color-mode user2
+
+python monitor_ips.py set --monitor ID_VA brightness=30 contrast=50 --dry-run
 python monitor_ips.py backup --monitor ID_VA --output backups\va-original.json
-
-# Comparar sem escrever
-python monitor_ips.py compare --source ID_IPS --target ID_VA
-
-# Preparar somente brilho e contraste sem escrever
-python monitor_ips.py apply --source ID_IPS --target ID_VA --features brightness contrast --dry-run
-
-# Aplicar: pergunta antes de escrever em um terminal interativo
-python monitor_ips.py apply --source ID_IPS --target ID_VA --features brightness contrast
-
-# Ajustes manuais em unidades nativas, dentro do máximo informado em list
-python monitor_ips.py set --monitor ID_VA brightness=35 contrast=65 --dry-run
-python monitor_ips.py set --monitor ID_VA red=45 green=43 blue=50
-
-# Restaurar: exige backup do próprio monitor e da mesma conexão
-python monitor_ips.py restore --monitor ID_VA --file backups\va-original.json --dry-run
 python monitor_ips.py restore --monitor ID_VA --file backups\va-original.json
+python monitor_ips.py --backup-dir backups match --source ID_IPS --target ID_VA --yes
 
-# Pasta personalizada para backups automáticos
-python monitor_ips.py --backup-dir backups apply --source ID_IPS --target ID_VA
-
-# Ajuda completa e ajuda por operação
+python monitor_ips.py --demo match --source demo-ips --target demo-va --yes
 python monitor_ips.py --help
-python monitor_ips.py restore --help
 ```
 
-Em automações, adicione `--yes` a `apply`, `set`, `restore` ou `oled` para confirmar a escrita
-sem pergunta. Sem terminal interativo, a ferramenta exige essa opção. `--dry-run`
-sempre prevalece e nunca escreve. `compare` e `list` apenas leem.
+Opções globais vêm antes do subcomando. Escritas exigem confirmação interativa
+ou `--yes` em automações. `--dry-run` não escreve e prevalece sobre `--yes`.
+O estado demo dura o processo atual; na janela, dura a sessão.
+`compare` e `apply` mantêm a cópia proporcional anterior dos cinco controles DDC.
+O comando legado `oled` não participa do novo fluxo de sincronização.
 
-Exemplos executáveis de demonstração:
+## Limitações
 
-```powershell
-python monitor_ips.py --demo list --json
-python monitor_ips.py --demo compare --source demo-ips --target demo-va
-python monitor_ips.py --demo apply --source demo-ips --target demo-va --yes
-```
+- Mesmos números não garantem mesma luminância, gamut, gamma físico ou contraste.
+  Calibração medida exige colorímetro. Não transforma IPS/VA em OLED.
+- A curva GPU usa uma API legada. HDR/WCG, topologia ambígua ou falha ao verificar SDR
+  bloqueiam sua cópia. Windows, jogos e apps de cor podem substituí-la depois.
+  Não há serviço, tarefa agendada ou watcher de reaplicação.
+- Ler um VCP não garante que aceite escrita. Falhas parciais informam o backup;
+  o controle pode ter mudado antes de falhar na verificação. Sem rollback silencioso.
+- Controles indisponíveis ou valores acima do máximo do destino são identificados
+  e não contam como iguais. Um preset pode afetar controles não legíveis.
+- Docks, telas internas, drivers e sessão remota podem limitar DDC. Prefira
+  conexão HDMI/DisplayPort direta, modo estendido e DDC/CI habilitado.
+- Não copia resolução, frequência, entrada, energia, ICC ou HDR.
 
-O estado simulado dura somente o processo atual. Para observar uma aplicação e
-restauração mantendo estado, use a janela de demonstração. Backups simulados são
-marcados e não podem ser usados em monitores reais, nem o inverso.
+## Desenvolvimento e validação
 
-Saída do CLI: `0` = operação concluída, prévia ou cancelamento voluntário;
-`1` = erro de operação/entrada; `2` = falha de argumentos do argparse ou aplicação
-incompleta (esta última informa `ok: false`, backup, controles verificados e falhas);
-`130` = interrupção por teclado. O JSON de `list --json` não recebe texto extra em
-stdout. Resultados de aplicação incluem um objeto JSON após a prévia textual.
-
-## O que é salvo e restaurado
-
-Os cinco controles permitidos são:
-
-| Nome no CLI | Controle | Código VCP |
-| --- | --- | --- |
-| `brightness` | Brilho | `0x10` |
-| `contrast` | Contraste | `0x12` |
-| `red` | Ganho vermelho | `0x16` |
-| `green` | Ganho verde | `0x18` |
-| `blue` | Ganho azul | `0x1A` |
-
-O backup JSON versão 1 contém data UTC, identificação da interface do monitor,
-valores e máximos dos controles legíveis, e erros dos controles indisponíveis.
-Backups novos também tentam ler a curva GPU SDR: quando disponível, usam a versão 2
-e incluem os três canais de 256 valores. Se HDR/driver impedir a leitura da curva,
-o backup apenas DDC registra esse motivo. Uma aplicação que inclua curva exige
-que ela tenha sido lida e salva antes da primeira escrita. Um backup de curva sem
-controles DDC legíveis também é válido na versão 2.
-Isso salva os controles e, na versão 2, a curva GPU SDR; não salva todos os menus,
-firmware, LUT interna do monitor, arquivo ICC ou configurações do Windows.
-**Restaurar significa voltar aos valores do
-arquivo, não executar reset de fábrica.**
-
-Por padrão, backups automáticos ficam em `%LOCALAPPDATA%\MonitorIPS\backups`.
-O modo demo usa `%LOCALAPPDATA%\MonitorIPS\demo-backups`. O caminho exato é exibido
-no log/resultado. Nomes únicos evitam sobrescrita. O arquivo é publicado completo
-antes de escrever no monitor; se o disco/pasta falhar, nada é aplicado. A publicação
-atômica usa hard link: prefira uma pasta local NTFS. Pastas em sistemas de arquivos
-que não suportem hard links serão recusadas antes de qualquer ajuste.
-
-A restauração exige o mesmo ID de interface e os mesmos máximos. Se trocar de
-porta, cabo/dock, modo de imagem ou monitor, atualize a lista e confira seus backups;
-não há opção para forçar uma restauração incompatível. A identidade usada vem do
-Windows, não é uma autenticação criptográfica nem uma garantia de número de série.
-Conexões espelhadas/agrupadas com identificação física ambígua bloqueiam escrita.
-
-O programa coordena acessos entre suas instâncias GUI/CLI. Evite ajustar no menu
-físico ou em outro software durante uma operação; esses acessos externos não podem
-ser bloqueados por esta ferramenta.
-
-## Limitações e solução de problemas
-
-- Os valores são proporcionais ao intervalo nativo, com arredondamento. Por
-  exemplo, 35/100 vira 70/200. Isso **não é equivalência de luminância ou cor**.
-  IPS e VA precisam de ajuste visual; calibração precisa requer um colorímetro.
-- Gamma VCP e temperatura de cor não são copiados. A curva GPU opcional é um
-  recurso separado. Ganhos RGB são individuais e não equivalem a uma temperatura Kelvin.
-- Uma leitura válida indica que o controle respondeu, mas não garante que aceite
-  escrita no modo atual. A aplicação confere a leitura após cada escrita e ao final.
-  Presets de imagem, HDR e contraste dinâmico podem limitar ou modificar controles.
-- Se uma escrita falhar, a sequência para e informa o backup. O controle que falhou
-  pode ter mudado antes da falha de verificação. Não há rollback silencioso; use
-  Restaurar e confira o resultado. Se DDC ficar indisponível, use o menu do monitor.
-- O suporte varia com monitor, driver, adaptadores, dock e conexão. Ative DDC/CI
-  no menu e tente conexão HDMI/DisplayPort direta em modo estendido. Telas internas
-  de notebooks e sessões remotas podem não expor DDC/CI.
-- Se `python` não for reconhecido, instale Python com Tcl/Tk e adicione ao PATH;
-  ou use `py -3 monitor_ips.py gui`. Para diagnosticar o atalho, abra pelo terminal.
-- Não altera ICC, HDR, resolução, taxa de atualização, entrada de vídeo ou energia.
-  A persistência dos ajustes após desligar depende do próprio monitor.
-
-## Desenvolvimento e verificação
+`desktop/` contém Electron, preload isolado, HTML/CSS/JS e cliente RPC.
+O renderer não tem Node, shell ou acesso direto a arquivos. Um Python por janela
+recebe JSON por stdin/stdout. Planos ficam no Python e são aplicados por token
+de uso único. `monitor_tool/service.py` concentra as regras, `windows.py` acessa
+DDC/CI e `tone.py` acessa a curva SDR. A janela aguarda operações antes de fechar
+e encerra seu próprio processo Python.
 
 ```powershell
 rtk proxy python -m unittest discover -s tests -v
 rtk proxy python -m compileall -q monitor_ips.py monitor_tool tests scripts
+rtk proxy npm.cmd test
+rtk proxy npm.cmd run check
+
+# QA Electron com CDP temporário e sessão exclusiva
+rtk proxy node scripts/qa-desktop-launch.cjs
+rtk proxy node scripts/qa-desktop-launch.cjs --real-read-only
+
+# QA Tkinter legado
 rtk proxy python scripts/qa_gui.py
 ```
 
-Os testes do serviço e CLI simulam o hardware, incluindo falha de backup, escrita
-parcial, efeitos entre controles, leitura divergente, restauração incompatível,
-prévia desatualizada e controles não permitidos. O smoke test Tkinter faz o fluxo
-completo simulado, valida a rolagem e encerra sua própria janela e thread.
-Opcionalmente, se Pillow já estiver instalado, salva `output/gui-demo.png`.
-Pillow não é uma dependência do aplicativo.
+O launcher de QA informa porta/PID/sessão em `output/desktop-qa.json`.
+Use Agent Browser com esse nome e porta. Ao terminar, invoque
+`window.monitor.qa('quit')`, feche a sessão exata e confirme a saída do launcher.
+QA só é habilitado em demo ou diagnóstico `--read-only`, que bloqueia apply no
+main. A abertura normal não usa CDP nem canais de QA.
 
-As leituras/escritas reais e a aplicação do Sabor OLED Equilibrado nas duas telas
-locais estão registradas em `documents/OLED-VALIDATION.md`. Correspondência visual,
-preferência estética e calibração colorimétrica não foram medidas por instrumento.
-
-Referências de implementação: [consulta VCP](https://learn.microsoft.com/en-us/windows/win32/api/lowlevelmonitorconfigurationapi/nf-lowlevelmonitorconfigurationapi-getvcpfeatureandvcpfeaturereply),
-[escrita VCP](https://learn.microsoft.com/en-us/windows/win32/api/lowlevelmonitorconfigurationapi/nf-lowlevelmonitorconfigurationapi-setvcpfeature),
-[enumeração e liberação dos monitores físicos](https://learn.microsoft.com/en-us/windows/win32/api/physicalmonitorenumerationapi/nf-physicalmonitorenumerationapi-getphysicalmonitorsfromhmonitor),
-[identificação da interface no Windows](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdisplaydevicesw).
+Evidências: [DESKTOP-VALIDATION.md](documents/DESKTOP-VALIDATION.md).
+Histórico: [VALIDATION.md](documents/VALIDATION.md),
+[OLED-VALIDATION.md](documents/OLED-VALIDATION.md).
+Referências: [Electron](https://www.electronjs.org/docs/latest/tutorial/security),
+[VCP](https://learn.microsoft.com/en-us/windows/win32/api/lowlevelmonitorconfigurationapi/nf-lowlevelmonitorconfigurationapi-getvcpfeatureandvcpfeaturereply),
+[curva GPU](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-setdevicegammaramp),
+[VCP 0x14](https://www.ddcutil.com/vcpinfo_output/).

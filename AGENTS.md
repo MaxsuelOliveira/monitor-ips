@@ -1,6 +1,7 @@
 # Monitor IPS
 
-Aplicativo local Windows em Python/Tkinter. CLI e GUI compartilham o serviço em
+Aplicativo local Windows: Electron/HTML/CSS na janela principal, Python no backend
+e CLI, Tkinter em `gui-tk` para compatibilidade. CLI e GUI compartilham o serviço em
 `monitor_tool/service.py`; somente `windows.py` acessa DDC/CI. `tone.py` acessa a curva
 GPU depois de confirmar SDR pela topologia Win32. Sem dependências
 Python externas em tempo de execução. Não aplicar ajustes no hardware durante QA
@@ -12,17 +13,30 @@ sem autorização específica para os monitores/valores. Usar `--demo` nos teste
 - Em projetos novos, verificar `rtk proxy npx.cmd --yes skills list -g`.
 - Planejamento: `grill-me` / `grilling`; fechar decisões com o usuário antes de codar.
 - Descoberta: `find-skills`, procurar uma skill adequada ao escopo.
-- Frontend/UI: `design-taste-frontend`; validar a interface real. Aqui a janela é
-  Tkinter, portanto validar widgets e captura nativa; um navegador não renderiza a GUI.
+- Frontend/UI: `design-taste-frontend`; validar a janela Electron real por Agent Browser/CDP,
+  screenshots e fluxos. A janela Tkinter legada exige QA nativo separado.
 - Navegador, quando houver páginas web: `agent-browser`, com sessão exclusiva e
-  encerramento em `finally`. Não iniciar browser para testes desta janela nativa.
+  encerramento em `finally`. Sessão exclusiva por tarefa. CDP somente em instâncias
+  próprias de QA; fechar app, backend Python e sessão exata ao concluir.
 - Vídeo/motion, quando solicitado: `hyperframes`, HTML com render em código.
 - Ler cada SKILL.md aplicável. Preservar instruções existentes ao atualizar este arquivo.
 
 ## Contratos
 
 - Allowlist: brilho, contraste, ganhos R/G/B. Não aceitar códigos VCP arbitrários,
-  reset de fábrica, energia ou entrada. Temperatura e gamma VCP ficam fora desta versão.
+  reset de fábrica, energia ou entrada. O único controle categórico de escrita é
+  modo de cor 0x14: consultar capacidades e aceitar somente presets anunciados.
+  Temperatura Kelvin arbitrária e gamma VCP ficam fora desta versão.
+- Sincronização: copiar valores atuais do IPS sem escrever na referência. Revalidar
+  origem/destino antes de aplicar. Verificar todos os controles compatíveis ao final,
+  inclusive os inicialmente iguais. Modo Usuário 2 foi validado no VA LHCFFFF para
+  permitir RGB; o preset nominal pode diferir do IPS e deve aparecer na prévia.
+- Backup schema 3 salva modo de cor e curva opcional. Restaurar preset antes dos
+  ganhos, tratar efeitos colaterais e continuar aceitando schemas 1 e 2 sem inventar campos.
+- Renderer isolado, sandbox, sem Node nem shell. IPC com sender validado e operações
+  limitadas. Backend Python via stdio, sem servidor. Planos por token de uso único,
+  nunca aceitar plano de escrita montado pelo renderer. Canais QA só em demo ou
+  diagnóstico `--read-only`, cujo apply é bloqueado no processo principal.
 - Sabor OLED é um perfil estético, não calibração medida. Curva GPU opcional apenas
   em SDR confirmado, um destino ativo por fonte GDI; bloquear HDR/WCG e espelhamento.
   Preservar extremos e monotonicidade e evitar acúmulo em reaplicações.
@@ -46,6 +60,14 @@ sem autorização específica para os monitores/valores. Usar `--demo` nos teste
 `rtk proxy python -m compileall -q monitor_ips.py monitor_tool tests`
 
 `rtk proxy python monitor_ips.py --demo list --json`
+
+`rtk proxy npm.cmd test`
+
+`rtk proxy npm.cmd run check`
+
+`rtk proxy node scripts/qa-desktop-launch.cjs` informa PID, porta e sessão próprios.
+Para leitura real sem permitir apply: acrescentar `--real-read-only`. Encerrar por
+`window.monitor.qa('quit')`, fechar sessão exata do Agent Browser e verificar saída.
 
 Para o smoke test nativo de leitura e screenshot com encerramento automático:
 `rtk proxy python scripts/qa_gui.py`. Ele usa apenas o backend de demonstração.

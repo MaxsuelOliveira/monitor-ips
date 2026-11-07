@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Monitor IPS</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="renderer.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <svg viewBox="0 0 38 28" width="38" height="28" aria-hidden="true">
+          <rect x="1" y="2" width="25" height="17" rx="2" />
+          <path d="M8 24h12M14 19v5" />
+          <path d="M30 8h6v16H24v-2" /></svg
+        ><span>Monitor IPS</span>
+      </div>
+      <nav aria-label="Seções">
+        <button data-tab="sync" class="tab active" aria-current="page">
+          Sincronizar</button
+        ><button data-tab="manual" class="tab">Ajuste fino</button
+        ><button data-tab="backups" class="tab">Backups</button>
+      </nav>
+      <div class="connection">
+        <span class="status-dot"></span
+        ><span id="connection">Lendo monitores…</span>
+      </div>
+    </header>
+    <main>
+      <div id="demo-banner" class="demo-banner" hidden>
+        Demonstração — duas telas simuladas. Nenhum monitor real é alterado.
+      </div>
+      <div class="page-title">
+        <div>
+          <h1 id="page-title">Seu IPS como referência.</h1>
+          <p id="page-description">
+            Copie os ajustes para o VA e use os dois como um par.
+          </p>
+        </div>
+        <button id="refresh" class="secondary icon-button">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M16 6a7 7 0 1 0 1 6M16 2v5h-5" /></svg
+          >Atualizar
+        </button>
+      </div>
+      <section class="pair" aria-label="Origem e destino">
+        <article class="monitor-panel reference">
+          <div class="panel-heading">
+            <span class="role">Referência</span
+            ><span id="source-type" class="panel-type">IPS</span>
+          </div>
+          <label for="source">Monitor que você quer reproduzir</label
+          ><select id="source" disabled>
+            <option>Carregando…</option>
+          </select>
+          <div class="monitor-summary">
+            <div class="screen-icon">
+              <span id="source-display">—</span><i></i>
+            </div>
+            <div>
+              <strong id="source-model">Aguardando leitura</strong>
+              <p id="source-details">
+                Os ajustes desta tela serão preservados.
+              </p>
+            </div>
+          </div>
+        </article>
+        <div class="transfer" aria-hidden="true">
+          <svg viewBox="0 0 28 20"><path d="M2 10h23M18 3l7 7-7 7" /></svg>
+        </div>
+        <article class="monitor-panel destination">
+          <div class="panel-heading">
+            <span class="role">Destino</span
+            ><span id="target-type" class="panel-type">VA</span>
+          </div>
+          <label for="target">Monitor que receberá os ajustes</label
+          ><select id="target" disabled>
+            <option>Carregando…</option>
+          </select>
+          <div class="monitor-summary">
+            <div class="screen-icon">
+              <span id="target-display">—</span><i></i>
+            </div>
+            <div>
+              <strong id="target-model">Aguardando leitura</strong>
+              <p id="target-details">Um backup será salvo antes de alterar.</p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section id="sync-view" class="view">
+        <div class="section-heading">
+          <h2>O que será igualado</h2>
+          <span id="comparison-count" class="muted">Aguardando comparação</span>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Controle</th>
+                <th>Referência</th>
+                <th>Destino agora</th>
+                <th>Depois da cópia</th>
+                <th class="status-col">Comparação</th>
+              </tr>
+            </thead>
+            <tbody id="comparison">
+              <tr>
+                <td colspan="5" class="empty">
+                  Lendo os controles dos seus monitores…
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="copy-options">
+          <label class="check-label"
+            ><input id="copy-tone" type="checkbox" checked /><span
+              >Copiar também a curva de tons SDR
+              <small
+                >Inclui a curva atual do IPS, sem criar outro perfil.</small
+              ></span
+            ></label
+          ><label class="mode-label" for="mode"
+            >Como copiar<select id="mode">
+              <option value="exact">Mesmos valores</option>
+              <option value="relative">Proporcional ao máximo</option>
+            </select></label
+          >
+        </div>
+        <details class="color-options">
+          <summary>Opções do modo de cor</summary>
+          <label class="mode-label" for="color-mode"
+            >Modo do destino
+            <select id="color-mode">
+              <option value="auto">RGB editável, automático</option>
+              <option value="source">Mesmo preset da referência</option>
+              <option value="user1">Usuário 1</option>
+              <option value="user2">Usuário 2</option>
+            </select>
+          </label>
+          <p class="muted">
+            Alguns presets bloqueiam RGB. O automático usa um modo Usuário
+            anunciado pelo monitor para copiar os ganhos do IPS.
+          </p>
+        </details>
+        <div class="action-bar">
+          <div>
+            <strong id="action-title"
+              >Primeiro, confira o par de monitores.</strong
+            >
+            <p id="action-description">
+              A referência é apenas lida. Todas as alterações vão para o
+              destino.
+            </p>
+          </div>
+          <button id="match" class="primary" disabled>
+            Igualar VA ao IPS <span aria-hidden="true">→</span>
+          </button>
+        </div>
+        <p class="footnote">
+          Os mesmos valores aproximam as configurações. As características
+          físicas dos painéis ainda podem produzir imagens diferentes.
+        </p>
+      </section>
+
+      <section id="manual-view" class="view" hidden>
+        <div class="section-heading">
+          <h2>Ajuste o destino com cuidado.</h2>
+          <button id="pattern" class="secondary">Abrir teste visual</button>
+        </div>
+        <p class="muted">
+          Use a referência na tabela ou confira sombras e realces no teste
+          visual. Os valores são nativos do monitor.
+        </p>
+        <form id="manual-form">
+          <div id="manual-fields" class="manual-grid"></div>
+          <div class="action-bar">
+            <p>Ajustes manuais também criam um backup automático.</p>
+            <button class="primary" type="submit">
+              Revisar ajustes <span aria-hidden="true">→</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section id="backups-view" class="view" hidden>
+        <div class="section-heading">
+          <h2>Seu ponto de retorno.</h2>
+          <button id="open-backups" class="secondary">
+            Abrir pasta de backups
+          </button>
+        </div>
+        <p class="muted">
+          Salve o estado atual do destino ou recupere um backup deste mesmo
+          monitor.
+        </p>
+        <div class="backup-actions">
+          <article>
+            <h3>Guardar os ajustes atuais</h3>
+            <p>Inclui os controles legíveis e a curva SDR quando disponível.</p>
+            <button id="backup" class="secondary">
+              Criar backup do destino
+            </button>
+          </article>
+          <article>
+            <h3>Voltar aos ajustes salvos</h3>
+            <p>
+              Escolha um JSON. Você confere as alterações antes de restaurar.
+            </p>
+            <button id="restore" class="secondary">
+              Escolher backup para restaurar
+            </button>
+          </article>
+        </div>
+        <p id="backup-directory" class="file-path"></p>
+      </section>
+
+      <div
+        id="notice"
+        class="notice"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></div>
+      <details id="history">
+        <summary>
+          Histórico desta sessão <span id="history-count">0</span>
+        </summary>
+        <ol id="history-list"></ol>
+      </details>
+      <footer>
+        <span>Local no seu computador</span
+        ><span>DDC/CI + curva SDR · Backup antes de aplicar</span>
+      </footer>
+    </main>
+    <dialog id="confirm">
+      <form method="dialog">
+        <div class="dialog-heading">
+          <span id="dialog-eyebrow">Revisar alterações</span
+          ><button
+            class="close-button"
+            value="cancel"
+            aria-label="Fechar confirmação"
+          >
+            ×
+          </button>
+        </div>
+        <h2 id="confirm-title">Igualar os monitores?</h2>
+        <p id="confirm-target"></p>
+        <ul id="confirm-changes"></ul>
+        <p id="confirm-extra" class="backup-note"></p>
+        <p class="backup-note">
+          O estado atual do destino será salvo antes da primeira alteração.
+        </p>
+        <div class="dialog-actions">
+          <button value="cancel" class="secondary">Cancelar</button
+          ><button id="confirm-apply" value="apply" class="primary">
+            Salvar backup e aplicar
+          </button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>

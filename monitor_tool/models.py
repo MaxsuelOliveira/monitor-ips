@@ -10,6 +10,9 @@ FEATURES = {
     "blue": (0x1A, "Ganho azul"),
 }
 
+CONTROL_LABELS = {name: label for name, (_, label) in FEATURES.items()}
+CONTROL_LABELS.update(color_preset="Modo de cor", tone_curve="Curva SDR")
+
 
 class MonitorError(Exception):
     """Erro apresentável sem traceback na interface/CLI."""

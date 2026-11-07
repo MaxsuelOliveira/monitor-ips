@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'"
+    />
+    <title>Teste visual</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="pattern.css" />
+    <script src="pattern.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <div class="section-heading">
+        <div>
+          <h1>Compare as duas telas.</h1>
+          <p class="muted">
+            Olhe de frente, sob a mesma luz. Este padrão ajuda no ajuste visual,
+            sem medir cores.
+          </p>
+        </div>
+        <button id="close" class="secondary">Fechar · Esc</button>
+      </div>
+      <section>
+        <h2>Detalhes nas sombras</h2>
+        <p class="muted">Procure distinguir 8, 12, 16 e 24 do preto.</p>
+        <div id="shadows" class="swatches"></div>
+      </section>
+      <section>
+        <h2>Separação dos realces</h2>
+        <p class="muted">Confira a diferença entre 240, 248 e branco.</p>
+        <div id="highlights" class="swatches"></div>
+      </section>
+      <section>
+        <h2>Escala de cinza</h2>
+        <p class="muted">Observe faixas ou dominantes de cor.</p>
+        <div id="grayscale"></div>
+      </section>
+    </main>
+  </body>
+</html>

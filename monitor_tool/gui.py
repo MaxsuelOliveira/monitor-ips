@@ -293,9 +293,11 @@ class App:
             self.append(f"{FEATURES[name][1]} ignorado: {reason}")
         if plan.tone:
             self.append(f"Curva SDR na prévia: {plan.tone['label']}")
+        if plan.color:
+            self.append(f"Modo de cor: 0x{plan.color['before']:02X} → 0x{plan.color['after']:02X}")
         for note in plan.notes:
             self.append(note)
-        count = len(plan.changes) + bool(plan.tone)
+        count = len(plan.changes) + bool(plan.tone) + bool(plan.color)
         self.status.set(f"Prévia: {count} alteração(ões) em {plan.monitor['name']}. "
                         "Confira a tabela e clique em Aplicar prévia.")
 
@@ -349,6 +351,8 @@ class App:
         if plan.tone:
             lines.append("Curva GPU SDR: " + plan.tone["label"])
             lines.append("Substitui a curva GPU atual. O backup permitirá restaurá-la.")
+        if plan.color:
+            lines.append(f"Modo de cor: 0x{plan.color['before']:02X} → 0x{plan.color['after']:02X}")
         if not messagebox.askyesno("Aplicar no destino?", f"{plan.monitor['name']} [{plan.monitor['id']}]\n\n"
                                   + "\n".join(lines) + "\n\nUm backup automático será salvo antes da alteração.",
                                   parent=self.root):
@@ -361,7 +365,7 @@ class App:
         self.append("Controles verificados: " + (", ".join(result["applied"]) or "nenhum"))
         if not result["ok"]:
             for name, error in result["failed"].items():
-                label = FEATURES[name][1] if name in FEATURES else "Curva GPU SDR"
+                label = FEATURES[name][1] if name in FEATURES else "Modo de cor" if name == "color_preset" else "Curva GPU SDR"
                 self.append(f"Falha em {label}: {error}")
             messagebox.showwarning("Aplicação incompleta", "A aplicação parou após uma falha. "
                                    "O controle que falhou pode ter mudado. Veja o log e restaure o backup se necessário.",
