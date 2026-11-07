@@ -14,6 +14,7 @@ class Bridge:
     def __init__(self, service):
         self.service = service
         self.pending = {}
+        self.last_backups = {}
 
     def state(self):
         data = self.service.inspect(include_tone=True)
@@ -30,6 +31,7 @@ class Bridge:
         data["backup_dir"] = str(self.service.backups.resolve())
         for profile in data["monitors"]:
             profile["tone_available"] = "tone_curve" in profile
+            profile["can_undo"] = profile["monitor"]["id"] in self.last_backups
         return data
 
     def preview(self, plan):
@@ -53,13 +55,36 @@ class Bridge:
                                  params.get("mode", "exact"), params.get("tone", True), params.get("color_mode", "auto")))
         if method == "preview_set":
             return self.preview(self.service.plan_set(params["target"], params["values"]))
+        if method == "preview_visual":
+            return self.preview(self.service.plan_visual(params["target"], params.get("values", {}), params.get("tone")))
+        if method == "preview_undo":
+            path = self.last_backups.get(params["target"])
+            if not path:
+                raise MonitorError("Nenhum ajuste desta sessão para desfazer neste monitor.")
+            return self.preview(self.service.plan_restore(params["target"], path))
+        if method == "diagnostics":
+            with self.service.session() as monitors:
+                monitor = self.service.find(monitors, params["target"])
+                if self.service.backend.demo:
+                    output = {"vendor": "NVIDIA (simulado)", "format": "RGB", "range": "full", "bits": 8, "read_only": True}
+                else:
+                    from .diagnostics import nvidia_output
+                    try:
+                        output = nvidia_output(monitor.device)
+                    except MonitorError as exc:
+                        output = {"range": "unknown", "error": str(exc), "read_only": True}
+                return {"monitor": monitor.public(), "output": output,
+                        "physical_black": "Não mensurado. Capturas de tela não medem a luz do painel."}
         if method == "preview_restore":
             return self.preview(self.service.plan_restore(params["target"], params["path"]))
         if method == "apply":
             plan = self.pending.pop(params["token"], None)
             if not plan:
                 raise MonitorError("Prévia expirada. Compare novamente.")
-            return self.service.execute(plan)
+            result = self.service.execute(plan)
+            if result.get("backup"):
+                self.last_backups[plan.monitor["id"]] = result["backup"]
+            return result
         if method == "backup":
             return {"path": str(self.service.backup(params["target"], params.get("path")))}
         if method == "discard":

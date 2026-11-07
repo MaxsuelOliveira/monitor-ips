@@ -23,6 +23,30 @@ for (let value = 0; value < 256; value++) {
 document
   .getElementById("close")
   .addEventListener("click", () => window.close());
+const parameters = new URLSearchParams(location.search);
+document.getElementById("pattern-label").textContent =
+  parameters.get("label") || "Padrão de teste";
+const blackMode = parameters.get("mode") === "black";
+if (blackMode) {
+  document.getElementById("black-reset").addEventListener("click", () => {
+    window.monitor.patternStep({ reset: true });
+  });
+  document.documentElement.style.backgroundColor = "#000";
+  document.body.classList.add("black-mode");
+  document.getElementById("black-test").hidden = false;
+  document.getElementById("pattern-title").textContent = "Teste de preto";
+  window.monitor.onPatternValue((value) => {
+    if (![0, 8, 16, 32].includes(value)) return;
+    document.body.style.backgroundColor = `rgb(${value},${value},${value})`;
+    document.documentElement.style.backgroundColor = `rgb(${value},${value},${value})`;
+    document.getElementById("black-value").textContent =
+      `Nível digital ${value} / 255`;
+  });
+}
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") window.close();
+  if (event.code === "Space" && blackMode) {
+    event.preventDefault();
+    window.monitor.patternStep();
+  }
 });

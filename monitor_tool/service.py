@@ -314,6 +314,37 @@ class Service:
                     changes.append(Change(name, before.current, after, before.maximum))
             return Plan(target.public(), changes, {}, self.backend.demo)
 
+    def plan_visual(self, target_id, values, tone=None):
+        """Ajustes DDC manuais e curva SDR explícita, sem inventar calibração física."""
+        if tone is None:
+            return self.plan_set(target_id, values)
+        if not isinstance(tone, dict) or any(k not in ("gamma", "black_point") for k in tone):
+            raise MonitorError("A curva aceita apenas meios-tons e corte de sombras.")
+        from .visual import manual_ramp
+        after_tone = manual_ramp(tone.get("gamma", 1.0), tone.get("black_point", 0.0))
+        if values:
+            plan = self.plan_set(target_id, values)
+        else:
+            with self.session() as monitors:
+                target = self.find(monitors, target_id)
+                self.check_target(target)
+                plan = Plan(target.public(), [], {}, self.backend.demo)
+        with self.session() as monitors:
+            target = self.find(monitors, target_id)
+            self.check_target(target)
+            before_tone = self.backend.read_tone(target)
+            expected = {}
+            for name, value in values.items():
+                current = self.backend.read(target, name)
+                expected[name] = asdict(Value(value, current.maximum))
+            plan.expected_target = {"values": expected, "tone_curve": after_tone}
+            if before_tone != after_tone:
+                plan.tone = {"before": before_tone, "after": after_tone,
+                             "label": f"Curva manual SDR: meios-tons {tone.get('gamma', 1):.2f}; corte {tone.get('black_point', 0):g}/255"}
+            plan.notes.extend(["A curva substitui a curva GPU atual e será salva no backup. Não altera o preto físico do painel.",
+                               "Corte de sombras pode esconder detalhes próximos do preto; confira o padrão antes de manter."])
+            return plan
+
     def plan_restore(self, target_id, path):
         profile = load_profile(path)
         if profile["demo"] != self.backend.demo:

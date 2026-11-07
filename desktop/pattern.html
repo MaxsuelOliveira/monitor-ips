@@ -9,6 +9,7 @@
     />
     <title>Teste visual</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="studio.css" />
     <link rel="stylesheet" href="pattern.css" />
     <script src="pattern.js" defer></script>
   </head>
@@ -16,13 +17,28 @@
     <main>
       <div class="section-heading">
         <div>
-          <h1>Compare as duas telas.</h1>
+          <h1 id="pattern-title">Compare as duas telas.</h1>
+          <p id="pattern-label" class="muted"></p>
           <p class="muted">
             Olhe de frente, sob a mesma luz. Este padrão ajuda no ajuste visual,
             sem medir cores.
           </p>
         </div>
         <button id="close" class="secondary">Fechar · Esc</button>
+      </div>
+      <div id="black-test" hidden>
+        <p id="black-value">Nível digital 0 / 255</p>
+        <button id="black-reset" class="secondary">
+          Voltar ao preto · nível 0
+        </button>
+        <p>
+          Espaço alterna 0, 8, 16 e 32 nas duas telas. Esc fecha esta janela.
+          Acima de zero, o fundo do teste fica cinza; isso não altera o monitor.
+        </p>
+        <p>
+          Compare de frente. Se o zero continuar emitindo luz, isso não é uma
+          medição nem uma correção do preto físico.
+        </p>
       </div>
       <section>
         <h2>Detalhes nas sombras</h2>

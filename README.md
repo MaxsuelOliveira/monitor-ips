@@ -2,7 +2,7 @@
 
 Aplicativo Windows com **Electron + HTML/CSS** e backend Python local para
 aproximar as configurações do VA às do IPS. A janela principal agora tem três
-seções: **Sincronizar**, **Ajuste fino** e **Backups**. O CLI continua independente
+seções: **Ajustar aparência**, **Copiar ajustes** e **Backups**. O CLI continua independente
 de Node/Electron. O perfil OLED anterior não aparece no novo fluxo principal.
 
 ## Abrir
@@ -35,7 +35,7 @@ Os comandos legados `compare`, `apply`, `pattern` e `oled` foram preservados.
 
 ## Igualar o VA ao IPS
 
-1. Em Sincronizar, escolha o IPS como **Referência** e o VA como **Destino**.
+1. Em Copiar ajustes, escolha o IPS como **Referência** e o VA como **Destino**.
 2. Confira a tabela: referência, destino atual, depois da cópia e comparação.
 3. **Mesmos valores** copia os números nativos. **Proporcional ao máximo**
    copia proporções quando as escalas forem diferentes.
@@ -69,10 +69,21 @@ Em **Opções do modo de cor**, escolha automático, mesmo preset literal da
 referência, Usuário 1 ou Usuário 2. O preset literal pode bloquear RGB e provocar
 falha de verificação. A aplicação informa essa falha, sem declarar sucesso.
 
-## Ajuste fino e backups
+## Ajustar aparência e backups
 
-- **Ajuste fino:** brilho, contraste e ganhos RGB em unidades nativas, dentro dos
-  máximos mostrados. Revise antes de aplicar. Também há backup automático.
+- **Ajustar aparência:** brilho, contraste e ganhos RGB em unidades nativas, com
+  campos numéricos, botões −/+ e sliders sincronizados. Editar apenas prepara os
+  valores; revise e confirme para aplicar, com backup automático.
+- **Curva SDR manual:** opção avançada, desligada por padrão. Meios-tons de 0,85
+  a 1,15 e corte de sombras de 0 a 4 níveis digitais. Substitui a curva atual por
+  uma curva absoluta e neutra, sem acumular ajustes. O corte pode esconder detalhes;
+  nenhum desses controles reduz o preto físico emitido pelo painel.
+- **Desfazer:** prepara a restauração do backup anterior à última aplicação no
+  destino durante esta sessão. Backups de outras sessões continuam disponíveis na aba.
+- **Preto lavado?:** consulta RGB/faixa completa por NVAPI somente leitura em GPUs
+  NVIDIA. Diagnóstico indisponível em outros drivers é informado sem inferir a faixa.
+  O teste de preto abre uma janela em cada tela selecionada: Espaço alterna ambos
+  entre 0, 8, 16 e 32; Esc fecha a janela. A comparação é visual, sem medição óptica.
 - **Teste visual:** sombras, realces e escala de cinza no destino. Esc ou Fechar
   encerra somente essa janela.
 - **Backups:** crie uma cópia, abra a pasta ou escolha um JSON do mesmo monitor
@@ -113,6 +124,9 @@ python monitor_ips.py match --source ID_IPS --target ID_VA --color-mode source -
 python monitor_ips.py match --source ID_IPS --target ID_VA --color-mode user2
 
 python monitor_ips.py set --monitor ID_VA brightness=30 contrast=50 --dry-run
+python monitor_ips.py tune --monitor ID_VA --brightness 20 --contrast 50 --dry-run
+python monitor_ips.py tune --monitor ID_VA --gamma 1.05 --black-point 0 --dry-run
+python monitor_ips.py diagnose --monitor ID_VA
 python monitor_ips.py backup --monitor ID_VA --output backups\va-original.json
 python monitor_ips.py restore --monitor ID_VA --file backups\va-original.json
 python monitor_ips.py --backup-dir backups match --source ID_IPS --target ID_VA --yes
@@ -150,6 +164,11 @@ recebe JSON por stdin/stdout. Planos ficam no Python e são aplicados por token
 de uso único. `monitor_tool/service.py` concentra as regras, `windows.py` acessa
 DDC/CI e `tone.py` acessa a curva SDR. A janela aguarda operações antes de fechar
 e encerra seu próprio processo Python.
+
+`diagnostics.py` consulta somente a faixa de saída NVIDIA; `visual.py` gera a curva
+manual. A atribuição da interface pública NVAPI está em `THIRD_PARTY_NOTICES.md`.
+`controls.js` mantém os controles personalizados e `studio.css` a aparência,
+incluindo animações que respeitam `prefers-reduced-motion`.
 
 ```powershell
 rtk proxy python -m unittest discover -s tests -v

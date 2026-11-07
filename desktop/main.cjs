@@ -24,12 +24,17 @@ const demo = process.argv.includes("--demo");
 const readOnly = process.argv.includes("--read-only");
 const qa = (demo || readOnly) && process.argv.includes("--qa");
 if (qa)
-  app.setPath("userData", path.join(root, "output", "desktop-qa-userdata"));
+  app.setPath(
+    "userData",
+    path.join(root, "output", `desktop-qa-userdata-${process.pid}`),
+  );
 const backupIndex = process.argv.indexOf("--backup-dir");
 let mainWindow,
   client,
   quitting = false,
   active = false;
+const patternWindows = new Set();
+let patternLevel = 0;
 
 async function handle(method, params) {
   if (readOnly && method === "apply")
@@ -117,6 +122,9 @@ app
       "state",
       "preview_match",
       "preview_set",
+      "preview_visual",
+      "preview_undo",
+      "diagnostics",
       "apply",
       "discard",
     ]) {
@@ -153,28 +161,77 @@ app
       const error = await shell.openPath(state.backup_dir);
       if (error) throw new Error(error);
     });
+    ipcMain.handle("monitor:display_settings", async (event) => {
+      allowed(event);
+      if (!qa) await shell.openExternal("ms-settings:display");
+      return true;
+    });
+    ipcMain.handle("monitor:pattern_step", async (event, params) => {
+      const sender = BrowserWindow.fromWebContents(event.sender);
+      if (!patternWindows.has(sender))
+        throw new Error("Janela de teste não autorizada.");
+      patternLevel = params?.reset === true ? 0 : (patternLevel + 1) % 4;
+      for (const win of patternWindows)
+        if (!win.isDestroyed())
+          win.webContents.send("pattern:value", [0, 8, 16, 32][patternLevel]);
+      return true;
+    });
     ipcMain.handle("monitor:pattern", async (event, params) => {
       allowed(event);
       const state = await handle("state", {});
-      const monitor = state.monitors.find(
-        (p) => p.monitor.id === params.target,
-      )?.monitor;
-      if (!monitor) throw new Error("Monitor ausente. Atualize a lista.");
-      const bounds = monitor.bounds;
-      const point = bounds
-        ? screen.screenToDipPoint({ x: bounds[0], y: bounds[1] })
-        : { x: 60, y: 60 };
-      const display = screen.getDisplayNearestPoint(point);
-      const pattern = secureWindow({
-        ...display.bounds,
-        width: qa ? 900 : display.bounds.width,
-        height: qa ? 680 : display.bounds.height,
-        parent: mainWindow,
-        title: "Teste visual",
-        frame: qa,
-        fullscreen: !qa,
-      });
-      await pattern.loadURL("monitor://app/pattern.html");
+      const ids = params.pair
+        ? [params.source, params.target]
+        : [params.target];
+      if (new Set(ids).size !== ids.length)
+        throw new Error("Escolha duas telas diferentes.");
+      const monitors = ids.map(
+        (id) => state.monitors.find((p) => p.monitor.id === id)?.monitor,
+      );
+      if (monitors.some((m) => !m))
+        throw new Error("Monitor ausente. Atualize a lista.");
+      for (const win of patternWindows) if (!win.isDestroyed()) win.close();
+      patternLevel = 0;
+      const opened = [];
+      try {
+        for (const monitor of monitors) {
+          const bounds = monitor.bounds;
+          const point = bounds
+            ? screen.screenToDipPoint({
+                x: Math.round((bounds[0] + bounds[2]) / 2),
+                y: Math.round((bounds[1] + bounds[3]) / 2),
+              })
+            : { x: 60, y: 60 };
+          const display = screen.getDisplayNearestPoint(point);
+          const pattern = secureWindow({
+            ...display.bounds,
+            width: qa && !params.fullscreen ? 900 : display.bounds.width,
+            height: qa && !params.fullscreen ? 680 : display.bounds.height,
+            title: "Teste visual",
+            frame: qa && !params.fullscreen,
+            show: false,
+          });
+          patternWindows.add(pattern);
+          opened.push(pattern);
+          pattern.on("closed", () => patternWindows.delete(pattern));
+          const mode = params.mode === "black" ? "black" : "steps";
+          const label = `${monitor.device.replace(/^.*DISPLAY/i, "DISPLAY ")} · ${monitor.name}`;
+          await pattern.loadURL(
+            "monitor://app/pattern.html?" +
+              new URLSearchParams({ mode, label }),
+          );
+          pattern.setBounds(display.bounds);
+          if (qa && !params.fullscreen) pattern.setSize(900, 680);
+          pattern.show();
+          if (!qa || params.fullscreen) pattern.setFullScreen(true);
+          pattern.webContents.send(
+            "pattern:value",
+            [0, 8, 16, 32][patternLevel],
+          );
+        }
+      } catch (error) {
+        for (const win of opened) if (!win.isDestroyed()) win.close();
+        throw error;
+      }
       return true;
     });
     // Canal de QA apenas em DEMO ou diagnóstico com apply bloqueado no main.
@@ -193,6 +250,18 @@ app
           mainWindow.close();
           return true;
         }
+        if (action === "displays")
+          return {
+            displays: screen.getAllDisplays().map((display) => ({
+              id: display.id,
+              bounds: display.bounds,
+              physical: screen.dipToScreenRect(null, display.bounds),
+            })),
+            patterns: [...patternWindows].map((win) => ({
+              bounds: win.getBounds(),
+              url: win.webContents.getURL(),
+            })),
+          };
         if (action?.resize) {
           mainWindow.setSize(...action.resize);
           return true;

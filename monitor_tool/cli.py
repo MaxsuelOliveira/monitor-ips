@@ -41,6 +41,14 @@ def parser():
     fine = sub.add_parser("set", help="Ajusta controles em unidades nativas, ex.: brightness=35.")
     fine.add_argument("--monitor", required=True)
     fine.add_argument("values", nargs="+", metavar="CONTROLE=VALOR")
+    tune = sub.add_parser("tune", help="Ajustes manuais de imagem e curva SDR opcional.")
+    tune.add_argument("--monitor", required=True)
+    for feature in FEATURES:
+        tune.add_argument("--" + feature, type=int)
+    tune.add_argument("--gamma", type=float, help="Meios-tons entre 0.85 e 1.15; substitui a curva GPU.")
+    tune.add_argument("--black-point", type=float, help="Corte de sombras 0 a 4 (pode esconder detalhes).")
+    diagnose = sub.add_parser("diagnose", help="Consulta faixa RGB NVIDIA, sem alterar o driver.")
+    diagnose.add_argument("--monitor", required=True)
     restore = sub.add_parser("restore", help="Restaura backup do mesmo monitor/conexão.")
     restore.add_argument("--monitor", required=True)
     restore.add_argument("--file", required=True)
@@ -52,7 +60,7 @@ def parser():
                       help="Também substitui a curva GPU SDR; exige HDR desligado e cria backup da curva.")
     pattern = sub.add_parser("pattern", help="Abre padrão visual de sombras, realces e gradientes na tela escolhida.")
     pattern.add_argument("--monitor", required=True)
-    for child in (fine, restore, oled):
+    for child in (fine, restore, oled, tune):
         child.add_argument("--yes", action="store_true")
         child.add_argument("--dry-run", action="store_true")
     return p
@@ -112,6 +120,10 @@ def main(argv=None):
                 monitor = service.find(monitors, args.monitor).public()
             launch_pattern(monitor)
             return 0
+        if command == "diagnose":
+            from .bridge import Bridge
+            print(json.dumps(Bridge(service).dispatch("diagnostics", {"target": args.monitor}), ensure_ascii=False, indent=2))
+            return 0
         if args.demo and not (command == "list" and args.json):
             print("DEMONSTRAÇÃO — nenhum monitor real será alterado; estado dura este processo.")
         if command == "list":
@@ -142,6 +154,10 @@ def main(argv=None):
             plan = service.compare(args.source, args.target, args.features)
         elif command == "set":
             plan = service.plan_set(args.monitor, parse_values(args.values))
+        elif command == "tune":
+            values = {name: getattr(args, name) for name in FEATURES if getattr(args, name) is not None}
+            tone = None if args.gamma is None and args.black_point is None else {"gamma": args.gamma if args.gamma is not None else 1.0, "black_point": args.black_point if args.black_point is not None else 0.0}
+            plan = service.plan_visual(args.monitor, values, tone)
         elif command == "oled":
             plan = service.plan_oled(args.monitor, args.panel, args.strength, args.tone_curve)
         else:

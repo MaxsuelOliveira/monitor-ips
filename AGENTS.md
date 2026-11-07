@@ -7,6 +7,12 @@ GPU depois de confirmar SDR pela topologia Win32. Sem dependências
 Python externas em tempo de execução. Não aplicar ajustes no hardware durante QA
 sem autorização específica para os monitores/valores. Usar `--demo` nos testes de escrita.
 
+`diagnostics.py` consulta NVAPI somente leitura; `visual.py` gera curvas manuais
+absolutas, limitadas e opcionais. Não confundir o fundo cinza dos níveis 8/16/32 do
+teste com uma alteração de hardware. Usar o centro do retângulo físico para mapear
+cada monitor para o display Electron; não associar janelas de teste como filhas da
+principal, pois o Windows pode colocá-las no mesmo monitor em tela cheia.
+
 ## Workflow global
 
 - Prefixar todo comando shell com `rtk`; política: `C:/Users/maxsu/.codex/RTK.md`.

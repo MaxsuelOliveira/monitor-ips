@@ -9,7 +9,11 @@
     />
     <title>Monitor IPS</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="studio.css" />
+    <link rel="stylesheet" href="simple.css" />
+    <script src="controls.js" defer></script>
     <script src="renderer.js" defer></script>
+    <script src="shell.js" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -21,9 +25,9 @@
         ><span>Monitor IPS</span>
       </div>
       <nav aria-label="Seções">
-        <button data-tab="sync" class="tab active" aria-current="page">
-          Sincronizar</button
-        ><button data-tab="manual" class="tab">Ajuste fino</button
+        <button data-tab="manual" class="tab active" aria-current="page">
+          Ajustar aparência</button
+        ><button data-tab="sync" class="tab">Copiar ajustes</button
         ><button data-tab="backups" class="tab">Backups</button>
       </nav>
       <div class="connection">
@@ -37,9 +41,9 @@
       </div>
       <div class="page-title">
         <div>
-          <h1 id="page-title">Seu IPS como referência.</h1>
+          <h1 id="page-title">Uma imagem do seu jeito.</h1>
           <p id="page-description">
-            Copie os ajustes para o VA e use os dois como um par.
+            Ajuste a aparência do VA usando o IPS como referência visual.
           </p>
         </div>
         <button id="refresh" class="secondary icon-button">
@@ -94,7 +98,7 @@
         </article>
       </section>
 
-      <section id="sync-view" class="view">
+      <section id="sync-view" class="view" hidden>
         <div class="section-heading">
           <h2>O que será igualado</h2>
           <span id="comparison-count" class="muted">Aguardando comparação</span>
@@ -170,24 +174,112 @@
         </p>
       </section>
 
-      <section id="manual-view" class="view" hidden>
-        <div class="section-heading">
-          <h2>Ajuste o destino com cuidado.</h2>
-          <button id="pattern" class="secondary">Abrir teste visual</button>
-        </div>
-        <p class="muted">
-          Use a referência na tabela ou confira sombras e realces no teste
-          visual. Os valores são nativos do monitor.
-        </p>
-        <form id="manual-form">
-          <div id="manual-fields" class="manual-grid"></div>
-          <div class="action-bar">
-            <p>Ajustes manuais também criam um backup automático.</p>
-            <button class="primary" type="submit">
-              Revisar ajustes <span aria-hidden="true">→</span>
+      <section id="manual-view" class="view">
+        <div class="workspace">
+          <form id="manual-form" class="tuning-panel">
+            <div class="section-heading">
+              <div>
+                <h2>Luz e equilíbrio</h2>
+                <p class="muted">Deslize, digite ou use os botões de ajuste.</p>
+              </div>
+              <div class="section-controls"><span id="draft-status" class="draft-status">Valores lidos</span><button class="primary" type="submit">Revisar ajustes <span aria-hidden="true">→</span></button></div>
+            </div>
+            <div id="manual-fields" class="manual-grid"></div>
+            <details id="tone-options" class="tone-options">
+              <summary>
+                Meios-tons e sombras <span>Avançado · SDR</span>
+              </summary>
+              <label class="check-label"
+                ><input id="manual-tone" type="checkbox" /><span
+                  >Ajustar a curva de tons do destino<small
+                    >A curva carregada será substituída. O backup permite
+                    recuperá-la.</small
+                  ></span
+                ></label
+              >
+              <div id="tone-fields" class="tone-grid"></div>
+              <p class="muted">
+                Cortar sombras pode esconder detalhes. O valor digital zero não
+                mede nem reduz a luz preta emitida pelo painel.
+              </p>
+            </details>
+            <div class="manual-note">
+              <div>
+                <strong>Experimente com um ponto de retorno.</strong>
+                <p>Os valores só são enviados depois da sua confirmação.</p>
+              </div>
+            </div>
+          </form>
+          <aside
+            class="visual-guide"
+            aria-label="Assistente de preto e contraste"
+          >
+            <div class="guide-header">
+              <span class="guide-tag">Preto e contraste</span>
+              <h2>Preto lavado?</h2>
+              <p>
+                Comece pelo sinal. Depois ajuste a aparência olhando as duas
+                telas.
+              </p>
+            </div>
+            <div class="black-reference">
+              <div class="black-zero"><span>0</span></div>
+              <div class="black-steps">
+                <span>8</span><span>16</span><span>24</span><span>32</span>
+              </div>
+              <p>Padrão digital. Não é uma medição do seu painel.</p>
+            </div>
+            <button id="compare-pattern" type="button" class="primary wide">
+              Comparar preto nas duas telas
             </button>
+            <div id="range-diagnostic" class="range-diagnostic" role="status">
+              <span class="diagnostic-dot"></span>
+              <div>
+                <strong id="range-title">Consultar a saída de vídeo</strong>
+                <p id="range-description">
+                  A faixa do sinal pode afetar os tons escuros.
+                </p>
+              </div>
+            </div>
+            <button id="diagnose" type="button" class="text-button">
+              Verificar faixa RGB
+            </button>
+            <details class="guide-steps">
+              <summary>Como comparar</summary>
+              <ol>
+                <li>Olhe de frente e mantenha a mesma luz ambiente.</li>
+                <li>
+                  No teste, compare o fundo 0 e os degraus 8, 16 e 32. Espaço
+                  alterna as duas telas juntas.
+                </li>
+                <li>
+                  Confira no menu do VA se há realce de sombras, Black Equalizer
+                  ou contraste dinâmico ativo.
+                </li>
+                <li>
+                  Se o fundo 0 ainda emitir mais luz, a curva digital não prova
+                  uma correção do preto físico.
+                </li>
+              </ol>
+            </details>
+            <div class="guide-tools">
+              <button id="pattern" type="button" class="secondary">
+                Teste de sombras e realces</button
+              ><button id="display-settings" type="button" class="text-button">
+                Configurações de tela do Windows ↗
+              </button>
+            </div>
+          </aside>
+        </div>
+        <div class="undo-strip">
+          <div>
+            <strong>Prefere o ajuste anterior?</strong>
+            <p>Desfaça o último ajuste deste monitor sem procurar o arquivo.</p>
           </div>
-        </form>
+          <button id="undo" class="secondary" type="button" disabled>
+            Desfazer último ajuste
+          </button>
+        </div>
       </section>
 
       <section id="backups-view" class="view" hidden>

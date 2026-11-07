@@ -32,3 +32,32 @@ section {
 body {
   background: #161616;
 }
+.black-mode {
+  background: #000;
+  min-height: 100vh;
+}
+.black-mode main {
+  max-width: none;
+}
+.black-mode main > section {
+  display: none;
+}
+.black-mode .section-heading {
+  opacity: 0.65;
+}
+.black-mode .section-heading h1 {
+  font-size: 18px;
+}
+#black-test {
+  position: fixed;
+  left: 30px;
+  right: 30px;
+  bottom: 25px;
+  color: #aaa;
+  font-size: 12px;
+  line-height: 1.6;
+}
+#black-value {
+  font-size: 22px;
+  color: #c1c1c1;
+}

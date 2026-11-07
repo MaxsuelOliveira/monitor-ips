@@ -62,6 +62,16 @@ function notice(text, error = false) {
   byId("notice").hidden = !text;
 }
 function lock() {
+  const profile = selected("target");
+  byId("undo").dataset.locked = String(!profile?.can_undo);
+  byId("manual-tone").dataset.locked = String(!profile?.tone_available);
+  document
+    .querySelectorAll("#tone-fields button, #tone-fields input")
+    .forEach((node) => {
+      node.dataset.locked = String(
+        !byId("manual-tone").checked || !profile?.tone_available,
+      );
+    });
   document.querySelectorAll("button, select, input").forEach((node) => {
     node.disabled = busy || node.dataset.locked === "true";
   });
@@ -73,6 +83,7 @@ function lock() {
       ? `${state.monitors.length} monitores conectados`
       : "Aguardando leitura";
   document.body.setAttribute("aria-busy", String(busy));
+  window.ControlInputs.sync();
 }
 async function run(work) {
   if (busy) return;
@@ -249,24 +260,89 @@ function renderManual() {
   const fields = byId("manual-fields");
   fields.replaceChildren();
   for (const [key, label] of Object.entries(features)) {
-    const value = profile?.values[key],
-      wrapper = element("label", label);
-    const input = element("input");
-    input.type = "number";
-    input.name = key;
-    input.min = "0";
-    input.step = "1";
-    input.value = value?.current ?? "";
-    input.max = value?.maximum ?? "0";
-    input.dataset.locked = String(!value);
-    input.disabled = !value;
-    input.setAttribute("aria-label", label);
-    wrapper.append(
-      input,
-      element("small", value ? `0 a ${value.maximum}` : "Indisponível"),
+    const value = profile?.values[key];
+    fields.append(
+      window.ControlInputs.create({
+        name: key,
+        label,
+        max: value?.maximum || 100,
+        value: value?.current || 0,
+        disabled: !value,
+        compact: !["brightness", "contrast"].includes(key),
+        description: {
+          brightness: "Intensidade da luz de fundo do monitor.",
+          contrast: "Separação dos tons. Confira os realces.",
+          red: "Equilíbrio do vermelho.",
+          green: "Equilíbrio do verde.",
+          blue: "Equilíbrio do azul.",
+        }[key],
+      }),
     );
-    fields.append(wrapper);
   }
+  byId("draft-status").textContent = "Valores lidos";
+  byId("draft-status").classList.remove("dirty");
+  if (!byId("tone-fields").children.length) {
+    byId("tone-fields").append(
+      window.ControlInputs.create({
+        name: "gamma",
+        label: "Meios-tons",
+        min: 0.85,
+        max: 1.15,
+        step: 0.01,
+        value: 1,
+        description: "Acima de 1 escurece meios-tons; abaixo de 1 clareia.",
+      }),
+      window.ControlInputs.create({
+        name: "black_point",
+        label: "Corte de sombras",
+        min: 0,
+        max: 4,
+        step: 0.5,
+        value: 0,
+        description:
+          "Corta níveis digitais perto do preto. Pode esconder detalhes.",
+      }),
+    );
+  }
+}
+async function diagnose() {
+  const profile = selected("target");
+  if (!profile) return;
+  const result = await api.diagnostics({ target: profile.monitor.id });
+  const output = result.output;
+  byId("range-title").textContent =
+    output.range === "full"
+      ? `${output.vendor} · RGB completo`
+      : output.range === "limited"
+        ? `${output.vendor} · RGB limitado`
+        : "Faixa de saída não confirmada";
+  byId("range-description").textContent =
+    output.range === "full"
+      ? `${output.bits || "?"} bits · o driver informa faixa completa. O nível físico de preto e o menu do monitor ainda precisam de avaliação visual.`
+      : output.range === "limited"
+        ? "O driver informa faixa limitada. Confira se ela corresponde à faixa esperada pelo monitor antes de mudar."
+        : output.error ||
+          `Formato ${output.format || "não informado"}. Confira a faixa no painel da GPU.`;
+}
+function readField(input) {
+  const raw = input.value.trim().replace(",", ".");
+  if (!raw) return null;
+  const value = Number(raw),
+    step = Number(input.dataset.step);
+  if (
+    !/^\d+(\.\d+)?$/.test(raw) ||
+    !Number.isFinite(value) ||
+    value < Number(input.dataset.min) ||
+    value > Number(input.dataset.max) ||
+    (step === 1 && !Number.isInteger(value))
+  ) {
+    input.setAttribute("aria-invalid", "true");
+    input.focus();
+    throw new Error(
+      `Confira ${input.getAttribute("aria-label")}: use valores de ${input.dataset.min} a ${input.dataset.max}.`,
+    );
+  }
+  return value;
 }
 async function compare() {
   invalidate();
@@ -325,6 +401,7 @@ async function load() {
   renderComparison();
   for (const warning of state.warnings) log(warning);
   await compare();
+  await diagnose();
 }
 function confirm(planTitle) {
   if (!plan?.has_changes) {
@@ -365,7 +442,7 @@ function confirm(planTitle) {
       element("li", `${labels[key]}: indisponível, não será copiado.`),
     );
   byId("confirm-extra").textContent = plan.notes
-    .filter((note) => note.includes("Usuário"))
+    .filter((note) => /Usuário|curva|sombras/i.test(note))
     .join(" ");
   byId("confirm").returnValue = "";
   byId("confirm").showModal();
@@ -377,6 +454,10 @@ for (const key of ["source", "target", "copy-tone", "mode", "color-mode"]) {
     run(async () => {
       renderPair();
       renderManual();
+      if (key === "target") {
+        byId("manual-tone").checked = false;
+        await diagnose();
+      }
       await compare();
     }),
   );
@@ -431,18 +512,62 @@ byId("manual-form").addEventListener("submit", (event) => {
   event.preventDefault();
   run(async () => {
     const values = {};
-    for (const input of byId("manual-fields").querySelectorAll("input")) {
-      if (input.dataset.locked !== "true" && input.value.trim() !== "")
-        values[input.name] = Number(input.value);
+    for (const input of byId("manual-fields").querySelectorAll(
+      "input[data-value]",
+    )) {
+      if (input.closest(".control-card").hidden) continue;
+      if (input.dataset.locked !== "true") {
+        const value = readField(input);
+        if (value !== null) values[input.name] = value;
+      }
     }
-    plan = await api.previewSet({
+    let tone = null;
+    if (byId("manual-tone").checked && !byId("tone-options").hidden) {
+      tone = {};
+      for (const input of byId("tone-fields").querySelectorAll(
+        "input[data-value]",
+      )) {
+        const value = readField(input);
+        if (value === null)
+          throw new Error("Preencha os dois controles da curva SDR.");
+        tone[input.name] = value;
+      }
+    }
+    plan = await api.previewVisual({
       target: selected("target").monitor.id,
       values,
+      tone,
     });
     previewKind = "manual";
     confirm("Aplicar os ajustes manuais?");
   });
 });
+byId("manual-form").addEventListener("input", () => {
+  byId("draft-status").textContent = "Alterações não aplicadas";
+  byId("draft-status").classList.add("dirty");
+});
+byId("manual-tone").addEventListener("change", lock);
+byId("diagnose").addEventListener("click", () => run(diagnose));
+byId("display-settings").addEventListener("click", () =>
+  run(() => api.displaySettings()),
+);
+byId("compare-pattern").addEventListener("click", () =>
+  run(() =>
+    api.pattern({
+      source: selected("source")?.monitor.id,
+      target: selected("target")?.monitor.id,
+      pair: true,
+      mode: "black",
+    }),
+  ),
+);
+byId("undo").addEventListener("click", () =>
+  run(async () => {
+    plan = await api.previewUndo({ target: selected("target").monitor.id });
+    previewKind = "undo";
+    confirm("Voltar ao ajuste anterior?");
+  }),
+);
 byId("backup").addEventListener("click", () =>
   run(async () => {
     const result = await api.backup({ target: selected("target").monitor.id });
@@ -480,8 +605,8 @@ for (const tab of document.querySelectorAll("[data-tab]")) {
         "Copie os ajustes para o VA e use os dois como um par.",
       ],
       manual: [
-        "Encontre o ajuste certo.",
-        "Refine os controles do destino, sem alterar a referência.",
+        "Uma imagem do seu jeito.",
+        "Ajuste a aparência do VA usando o IPS como referência visual.",
       ],
       backups: [
         "Um caminho de volta.",
@@ -490,7 +615,8 @@ for (const tab of document.querySelectorAll("[data-tab]")) {
     };
     [byId("page-title").textContent, byId("page-description").textContent] =
       titles[tab.dataset.tab];
-    if (tab.dataset.tab === "sync" && (previewKind !== "match" || !plan)) run(compare);
+    if (tab.dataset.tab === "sync" && (previewKind !== "match" || !plan))
+      run(compare);
   });
 }
 run(load);
