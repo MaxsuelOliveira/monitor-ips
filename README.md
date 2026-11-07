@@ -68,15 +68,18 @@ Backups são arquivos JSON versionados no computador. Você pode criar uma cópi
 | Sistema | Windows 10 ou 11 |
 | Python | 3.10 ou superior, acessível pelo comando `python` |
 | Node.js | 22.12 ou superior, com npm, para a interface Electron |
+| Git | Para clonar o repositório; alternativamente, obtenha o código pelo download ZIP do GitHub |
 | Monitor | DDC/CI habilitado para controles de hardware; suporte varia por monitor e conexão |
 | Curva GPU | SDR confirmado e topologia compatível; HDR/WCG bloqueiam esse recurso |
 | Internet | Necessária para a preparação inicial das dependências |
 
 ### Instalação
 
-Abra o PowerShell na pasta do projeto, depois de obter o código:
+Abra o PowerShell e obtenha o código:
 
 ```powershell
+git clone https://github.com/MaxsuelOliveira/monitor-ips.git
+cd monitor-ips
 npm ci
 npm run prepare:desktop
 npm run demo
@@ -143,7 +146,7 @@ Para propor mudanças, preserve o fluxo de prévia, confirmação, backup e veri
 
 ## Licenciamento
 
-A licença de distribuição do código próprio do Monitor IPS ainda não foi definida. A publicação pública será preparada em uma etapa separada, após essa escolha.
+A licença de distribuição do código próprio do Monitor IPS ainda não foi definida.
 
 Componentes de terceiros mantêm suas licenças e atribuições: [avisos de terceiros](THIRD_PARTY_NOTICES.md), [assets do aplicativo](desktop/assets/SOURCES.md) e [assets da documentação](documents/assets/SOURCES.md).
 

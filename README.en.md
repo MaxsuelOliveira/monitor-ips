@@ -68,15 +68,18 @@ Backups are versioned JSON files on your computer. Create a manual backup, resto
 | System | Windows 10 or 11 |
 | Python | 3.10 or newer, available through the `python` command |
 | Node.js | 22.12 or newer with npm, for the Electron interface |
+| Git | For cloning; alternatively, download the source ZIP from GitHub |
 | Monitor | DDC/CI enabled for hardware controls; support varies by monitor and connection |
 | GPU curve | Confirmed SDR and compatible topology; HDR/WCG block this feature |
 | Internet | Required for the initial dependency setup |
 
 ### Installation
 
-Open PowerShell in the project folder after obtaining the source code:
+Open PowerShell and obtain the source code:
 
 ```powershell
+git clone https://github.com/MaxsuelOliveira/monitor-ips.git
+cd monitor-ips
 npm ci
 npm run prepare:desktop
 npm run demo
@@ -145,7 +148,7 @@ For proposed changes, preserve preview, confirmation, backup and verification. R
 
 ## Licensing
 
-A distribution license for Monitor IPS's own code has not been selected yet. A public release will be prepared separately after that decision.
+A distribution license for Monitor IPS's own code has not been selected yet.
 
 Third-party components retain their licenses and attribution: [third-party notices](THIRD_PARTY_NOTICES.md), [application assets](desktop/assets/SOURCES.md) and [documentation assets](documents/assets/SOURCES.md).
 
