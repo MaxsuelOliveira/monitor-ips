@@ -8,6 +8,9 @@ class DemoBackend:
     warnings = []
 
     def __init__(self):
+        self.hdr = False
+        self.tones = {name: [[i * 257 for i in range(256)] for _ in range(3)]
+                      for name in ("demo-ips", "demo-va")}
         self.monitors = [Monitor("demo-ips", "IPS de demonstração", "DEMO 1", "demo:ips"),
                          Monitor("demo-va", "VA de demonstração", "DEMO 2", "demo:va")]
         self.values = {
@@ -30,3 +33,12 @@ class DemoBackend:
     def write(self, monitor, feature, value):
         old = self.read(monitor, feature)
         self.values[monitor.id][feature] = Value(value, old.maximum)
+
+    def read_tone(self, monitor):
+        if self.hdr:
+            raise MonitorError("HDR ativo; curva SDR bloqueada na demonstração.")
+        return [channel.copy() for channel in self.tones[monitor.id]]
+
+    def write_tone(self, monitor, values):
+        self.read_tone(monitor)  # Confere SDR também na escrita.
+        self.tones[monitor.id] = [channel.copy() for channel in values]

@@ -1,7 +1,8 @@
 # Monitor IPS
 
 Aplicativo local Windows em Python/Tkinter. CLI e GUI compartilham o serviço em
-`monitor_tool/service.py`; somente `windows.py` acessa DDC/CI. Sem dependências
+`monitor_tool/service.py`; somente `windows.py` acessa DDC/CI. `tone.py` acessa a curva
+GPU depois de confirmar SDR pela topologia Win32. Sem dependências
 Python externas em tempo de execução. Não aplicar ajustes no hardware durante QA
 sem autorização específica para os monitores/valores. Usar `--demo` nos testes de escrita.
 
@@ -21,7 +22,15 @@ sem autorização específica para os monitores/valores. Usar `--demo` nos teste
 ## Contratos
 
 - Allowlist: brilho, contraste, ganhos R/G/B. Não aceitar códigos VCP arbitrários,
-  reset de fábrica, energia ou entrada. Gamma e temperatura ficam fora desta versão.
+  reset de fábrica, energia ou entrada. Temperatura e gamma VCP ficam fora desta versão.
+- Sabor OLED é um perfil estético, não calibração medida. Curva GPU opcional apenas
+  em SDR confirmado, um destino ativo por fonte GDI; bloquear HDR/WCG e espelhamento.
+  Preservar extremos e monotonicidade e evitar acúmulo em reaplicações.
+- Backup schema 2 inclui curva GPU de 3x256 WORDs. Restaurar schema 1 muda apenas
+  DDC; nunca fingir que ele restaura a curva GPU. Falha silenciosa da API é erro de aplicação.
+- Não prometer preto OLED, gamut novo, HDR ou persistência da curva. Não criar serviço
+  ou watcher para reaplicar curvas. O usuário confirmou DISPLAY2 como IPS nesta máquina;
+  a classificação local está em `monitor_roles.json` (ignorado pelo Git), sem autodetecção.
 - Prévia + backup completo dos controles legíveis do destino antes de qualquer escrita.
 - Backups JSON versionados, sem sobrescrever. Demonstração isolada de hardware real.
 - Restauração exige mesmo identificador/interface e mesmos máximos. Não forçar

@@ -3,6 +3,10 @@
 Ferramenta local para Windows, feita em Python, com janela Tkinter e CLI. Lê os
 controles de imagem do IPS e do VA, compara os valores, prepara uma cópia
 proporcional, permite ajustes manuais e restaura os valores salvos em backup.
+Inclui **Sabor OLED**, um perfil visual com ajustes próprios para IPS e VA,
+intensidades Suave/Equilibrado/Cinema e uma curva SDR opcional para meios-tons mais
+profundos. É uma aproximação estética: não transforma o painel em OLED e não é
+calibração instrumental.
 Não precisa de ControlMyMonitor, PowerShell auxiliar, conta ou serviço externo.
 
 ## Abrir a janela
@@ -26,8 +30,11 @@ python monitor_ips.py --demo gui
 1. Clique em **Atualizar monitores**. Os identificadores são exibidos junto ao nome
    e à conexão `DISPLAY1`, `DISPLAY2` etc. Use Configurações → Sistema → Tela →
    Identificar, no Windows, para reconhecer as telas. O programa não detecta IPS/VA.
-2. Selecione seu IPS como origem e seu VA como destino. A pré-seleção é apenas a
-   ordem das telas, não uma classificação dos painéis.
+2. Para copiar, selecione seu IPS como origem e seu VA como destino. Para perfis e
+   restauração, o destino pode ser qualquer uma das telas. Sem classificação local,
+   a pré-seleção é apenas a ordem das telas. O arquivo opcional `monitor_roles.json`
+   mapeia IDs para `ips`/`va`, é ignorado pelo Git e permite mostrar o tipo nos seletores.
+   Nesta máquina, DISPLAY2 foi identificado pelo usuário como IPS e DISPLAY1 como VA.
 3. Use **Backup do destino** para guardar uma cópia manual. Antes de qualquer
    aplicação o programa também cria um backup automático.
 4. Marque os controles desejados e clique em **Comparar / preparar cópia**. A tabela
@@ -44,6 +51,66 @@ python monitor_ips.py --demo gui
 
 A janela possui rolagem para telas menores ou escala de texto alta. Leituras DDC
 rodam em uma thread de trabalho; aguarde a operação terminar para fechar a janela.
+
+## Sabor OLED
+
+Na janela, selecione o **destino**, confira **Painel do destino**, escolha a
+intensidade e clique em **Preparar Sabor OLED**, depois em **Aplicar prévia**.
+A opção **Curva SDR: substituir curva GPU atual** vem marcada na janela e é
+explicitamente listada na confirmação. Desmarque para ajustar somente a luz de fundo.
+A origem não participa desse perfil: aplique separadamente em cada tela.
+
+| Intensidade | Teto de brilho IPS | Teto de brilho VA | Curva de meios-tons |
+| --- | --- | --- | --- |
+| Suave | 28% do máximo | 22% do máximo | Leve |
+| Equilibrado (padrão) | 22% do máximo | 16% do máximo | Moderada |
+| Cinema | 16% do máximo | 12% do máximo | Mais forte |
+
+Esses números são pontos de partida heurísticos, não nits nem medições de contraste.
+O perfil não aumenta um brilho que já esteja abaixo do teto. Preserva os controles
+DDC de contraste e RGB. A curva GPU é absoluta e neutra nos três canais: substitui
+a curva atual, sem multiplicar reaplicações ou alterar arquivos/perfis ICC. Se havia
+uma curva de calibração carregada por outro software, ela será substituída até
+restaurar ou o software/Windows carregá-la novamente.
+
+As curvas preservam os códigos de entrada 0..8 e 240..255 e são monotônicas;
+escurecem os meios-tons. Isso evita clipping introduzido pelo algoritmo nesses
+extremos, mas não garante distinção física de todos os degraus no seu painel.
+O ajuste VA é mais suave que o IPS para reduzir o risco de perder detalhes escuros.
+
+Use **Teste visual no destino** para abrir sombras, realces e gradiente neutro na
+tela selecionada. **Esc** ou **Fechar** encerra apenas essa janela. Olhe de frente,
+na luz em que usa o monitor. A tela ajuda no ajuste visual, sem medir ou certificar cor.
+
+Exemplos CLI:
+
+```powershell
+# Prévia com curva GPU (HDR precisa estar desligado)
+python monitor_ips.py oled --monitor ID_IPS --panel ips --strength balanced --tone-curve --dry-run
+
+# Aplicar, com confirmação interativa e backup automático
+python monitor_ips.py oled --monitor ID_IPS --panel ips --strength balanced --tone-curve
+python monitor_ips.py oled --monitor ID_VA --panel va --strength balanced --tone-curve
+
+# Apenas luz de fundo, sem mexer na curva GPU
+python monitor_ips.py oled --monitor ID_VA --panel va --strength subtle
+
+# Padrão visual na tela escolhida
+python monitor_ips.py pattern --monitor ID_IPS
+```
+
+Para desfazer **brilho e curva**, use Restaurar com o backup schema 2 criado antes
+do perfil. Backups antigos schema 1 só restauram controles DDC e a prévia avisa isso.
+O caminho do backup é apresentado após cada aplicação. Backups reais/simulados
+continuam isolados. Se a curva não puder ser confirmada após a escrita, a operação
+informa falha e fornece o backup; não relata sucesso apenas porque a API retornou TRUE.
+
+**Limitações da curva:** requer SDR confirmado; HDR/Advanced Color ativo, topologia
+ambígua ou impossibilidade de verificar o modo bloqueiam a curva antes de aplicar
+o plano. O Windows, jogos ou aplicativos de calibração podem substituí-la depois.
+Não há serviço de reaplicação, tarefa agendada ou watcher. A curva pode ser perdida
+ao reiniciar, mudar resolução/conexões ou abrir certos jogos. Reaplique manualmente.
+Essas limitações são descritas pela [Microsoft na documentação de SetDeviceGammaRamp](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-setdevicegammaramp).
 
 ## Linha de comando
 
@@ -85,7 +152,7 @@ python monitor_ips.py --help
 python monitor_ips.py restore --help
 ```
 
-Em automações, adicione `--yes` a `apply`, `set` ou `restore` para confirmar a escrita
+Em automações, adicione `--yes` a `apply`, `set`, `restore` ou `oled` para confirmar a escrita
 sem pergunta. Sem terminal interativo, a ferramenta exige essa opção. `--dry-run`
 sempre prevalece e nunca escreve. `compare` e `list` apenas leem.
 
@@ -121,8 +188,14 @@ Os cinco controles permitidos são:
 
 O backup JSON versão 1 contém data UTC, identificação da interface do monitor,
 valores e máximos dos controles legíveis, e erros dos controles indisponíveis.
-Isso é um backup desses controles, não de todos os menus, firmware, LUT, perfil
-ICC ou configurações do Windows. **Restaurar significa voltar aos valores do
+Backups novos também tentam ler a curva GPU SDR: quando disponível, usam a versão 2
+e incluem os três canais de 256 valores. Se HDR/driver impedir a leitura da curva,
+o backup apenas DDC registra esse motivo. Uma aplicação que inclua curva exige
+que ela tenha sido lida e salva antes da primeira escrita. Um backup de curva sem
+controles DDC legíveis também é válido na versão 2.
+Isso salva os controles e, na versão 2, a curva GPU SDR; não salva todos os menus,
+firmware, LUT interna do monitor, arquivo ICC ou configurações do Windows.
+**Restaurar significa voltar aos valores do
 arquivo, não executar reset de fábrica.**
 
 Por padrão, backups automáticos ficam em `%LOCALAPPDATA%\MonitorIPS\backups`.
@@ -147,8 +220,8 @@ ser bloqueados por esta ferramenta.
 - Os valores são proporcionais ao intervalo nativo, com arredondamento. Por
   exemplo, 35/100 vira 70/200. Isso **não é equivalência de luminância ou cor**.
   IPS e VA precisam de ajuste visual; calibração precisa requer um colorímetro.
-- Gamma e temperatura de cor não são copiados nesta versão. Use o menu físico do
-  monitor. Ganhos RGB são individuais e não equivalem a uma temperatura Kelvin.
+- Gamma VCP e temperatura de cor não são copiados. A curva GPU opcional é um
+  recurso separado. Ganhos RGB são individuais e não equivalem a uma temperatura Kelvin.
 - Uma leitura válida indica que o controle respondeu, mas não garante que aceite
   escrita no modo atual. A aplicação confere a leitura após cada escrita e ao final.
   Presets de imagem, HDR e contraste dinâmico podem limitar ou modificar controles.
@@ -178,8 +251,9 @@ completo simulado, valida a rolagem e encerra sua própria janela e thread.
 Opcionalmente, se Pillow já estiver instalado, salva `output/gui-demo.png`.
 Pillow não é uma dependência do aplicativo.
 
-As escritas e a correspondência visual em hardware real precisam ser verificadas
-pelo usuário após selecionar fisicamente qual tela é IPS/VA.
+As leituras/escritas reais e a aplicação do Sabor OLED Equilibrado nas duas telas
+locais estão registradas em `documents/OLED-VALIDATION.md`. Correspondência visual,
+preferência estética e calibração colorimétrica não foram medidas por instrumento.
 
 Referências de implementação: [consulta VCP](https://learn.microsoft.com/en-us/windows/win32/api/lowlevelmonitorconfigurationapi/nf-lowlevelmonitorconfigurationapi-getvcpfeatureandvcpfeaturereply),
 [escrita VCP](https://learn.microsoft.com/en-us/windows/win32/api/lowlevelmonitorconfigurationapi/nf-lowlevelmonitorconfigurationapi-setvcpfeature),

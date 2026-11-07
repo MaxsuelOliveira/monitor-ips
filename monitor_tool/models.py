@@ -36,7 +36,8 @@ class Monitor:
     physical_index: int = 0
     writable_identity: bool = True
     handle: int = field(default=0, repr=False)
+    bounds: tuple[int, int, int, int] | None = None
 
     def public(self):
         return {k: getattr(self, k) for k in (
-            "id", "name", "device", "identity", "physical_index", "writable_identity")}
+            "id", "name", "device", "identity", "physical_index", "writable_identity", "bounds")}

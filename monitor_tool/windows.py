@@ -96,7 +96,9 @@ class WindowsBackend:
                     model = identity.split("#")[1] if certain and "#" in identity else ""
                     name = f"{item.description} ({model})" if model else item.description
                     monitors.append(Monitor(short, name, info.device,
-                                            identity, index, certain, item.handle))
+                                            identity, index, certain, item.handle,
+                                            (info.monitor.left, info.monitor.top,
+                                             info.monitor.right, info.monitor.bottom)))
                 return True
             except Exception as exc:
                 errors.append(str(exc))
@@ -134,3 +136,11 @@ class WindowsBackend:
         if not self.dx.SetVCPFeature(monitor.handle, FEATURES[feature][0], value):
             raise self.error(f"Ajustar {FEATURES[feature][1]}")
         time.sleep(0.15)
+
+    def read_tone(self, monitor):
+        from .tone import WindowsTone
+        return WindowsTone().read(monitor)
+
+    def write_tone(self, monitor, values):
+        from .tone import WindowsTone
+        WindowsTone().write(monitor, values)

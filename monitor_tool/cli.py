@@ -4,6 +4,7 @@ import sys
 
 from .models import FEATURES, MonitorError
 from .service import Service
+from .looks import STRENGTHS
 
 
 def parser():
@@ -33,7 +34,15 @@ def parser():
     restore = sub.add_parser("restore", help="Restaura backup do mesmo monitor/conexão.")
     restore.add_argument("--monitor", required=True)
     restore.add_argument("--file", required=True)
-    for child in (fine, restore):
+    oled = sub.add_parser("oled", help="Prepara/aplica Sabor OLED para um painel IPS ou VA (perfil estético SDR).")
+    oled.add_argument("--monitor", required=True)
+    oled.add_argument("--panel", required=True, choices=["ips", "va"])
+    oled.add_argument("--strength", choices=list(STRENGTHS), default="balanced")
+    oled.add_argument("--tone-curve", action="store_true",
+                      help="Também substitui a curva GPU SDR; exige HDR desligado e cria backup da curva.")
+    pattern = sub.add_parser("pattern", help="Abre padrão visual de sombras, realces e gradientes na tela escolhida.")
+    pattern.add_argument("--monitor", required=True)
+    for child in (fine, restore, oled):
         child.add_argument("--yes", action="store_true")
         child.add_argument("--dry-run", action="store_true")
     return p
@@ -57,10 +66,14 @@ def print_plan(plan):
     print(f"Destino: {plan.monitor['name']} [{plan.monitor['id']}]")
     for change in plan.changes:
         print(f"  {FEATURES[change.feature][1]}: {change.before} -> {change.after} / {change.maximum}")
-    if not plan.changes:
+    if plan.tone:
+        print(f"  Curva SDR: {plan.tone['label']}")
+    if not plan.has_changes:
         print("Nenhuma alteração aplicável.")
     for name, reason in plan.skipped.items():
         print(f"  Ignorado — {FEATURES[name][1]}: {reason}")
+    for note in plan.notes:
+        print(f"  Nota: {note}")
 
 
 def main(argv=None):
@@ -77,6 +90,12 @@ def main(argv=None):
         if command == "gui":
             from .gui import launch
             launch(service)
+            return 0
+        if command == "pattern":
+            from .patterns import launch_pattern
+            with service.session() as monitors:
+                monitor = service.find(monitors, args.monitor).public()
+            launch_pattern(monitor)
             return 0
         if args.demo and not (command == "list" and args.json):
             print("DEMONSTRAÇÃO — nenhum monitor real será alterado; estado dura este processo.")
@@ -106,10 +125,12 @@ def main(argv=None):
             plan = service.compare(args.source, args.target, args.features)
         elif command == "set":
             plan = service.plan_set(args.monitor, parse_values(args.values))
+        elif command == "oled":
+            plan = service.plan_oled(args.monitor, args.panel, args.strength, args.tone_curve)
         else:
             plan = service.plan_restore(args.monitor, args.file)
         print_plan(plan)
-        if command == "compare" or args.dry_run or not plan.changes:
+        if command == "compare" or args.dry_run or not plan.has_changes:
             return 0
         if not args.yes:
             if not sys.stdin.isatty():

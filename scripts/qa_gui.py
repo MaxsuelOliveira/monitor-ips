@@ -23,6 +23,18 @@ def wait(root, app):
     root.update()
 
 
+def capture(window, path):
+    """Captura somente o HWND próprio, mesmo com outro app em primeiro plano."""
+    from PIL import ImageGrab
+    import ctypes as C
+    from ctypes import wintypes as W
+    window.update_idletasks()
+    user = C.WinDLL("user32", use_last_error=True)
+    user.GetAncestor.argtypes, user.GetAncestor.restype = [W.HWND, W.UINT], W.HWND
+    hwnd = user.GetAncestor(window.winfo_id(), 2)
+    ImageGrab.grab(window=hwnd).save(path)
+
+
 def main():
     enable_dpi_awareness()
     root = tk.Tk()
@@ -46,9 +58,7 @@ def main():
             except ImportError:
                 print("Pillow indisponível: screenshot opcional não capturada.")
             else:
-                bbox = (root.winfo_rootx(), root.winfo_rooty(),
-                        root.winfo_rootx() + root.winfo_width(), root.winfo_rooty() + root.winfo_height())
-                ImageGrab.grab(bbox=bbox, all_screens=True).save(output / "gui-demo.png")
+                capture(root, output / "gui-demo.png")
             with patch("monitor_tool.gui.messagebox.askyesno", return_value=True):
                 app.apply()
             wait(root, app)
@@ -69,6 +79,32 @@ def main():
             app.source.current(1)
             app.selection_changed()
             assert app.plan is None
+            app.target.current(0)
+            app.selection_changed()
+            assert app.panel.get() == "IPS"
+            app.prepare_oled()
+            wait(root, app)
+            assert app.plan.tone
+            assert app.plan.has_changes
+            with patch("monitor_tool.gui.messagebox.askyesno", return_value=True):
+                app.apply()
+            wait(root, app)
+            assert service.backend.values["demo-ips"]["brightness"].current == 22
+            from monitor_tool.looks import oled_ramp
+            assert service.backend.tones["demo-ips"] == oled_ramp("ips", "balanced")
+            previous_windows = set(root.winfo_children())
+            app.pattern()
+            root.update()
+            created = [w for w in root.winfo_children() if w not in previous_windows]
+            assert len(created) == 1
+            pattern_window = created[0]
+            root.update_idletasks()
+            if "ImageGrab" in locals():
+                capture(pattern_window, output / "pattern-demo.png")
+            pattern_window.destroy()
+            app.prepare_oled()
+            wait(root, app)
+            assert not app.plan.has_changes
             root.geometry("850x720")
             root.update()
             assert app.log.winfo_height() > 35
@@ -76,8 +112,8 @@ def main():
             root.update()
             assert app.canvas.yview()[1] > 0.99
             assert not app.worker.is_alive()
-            print("GUI OK: leitura, comparação, aplicação, restauração, ajuste manual, "
-                  "invalidação da prévia, tamanho mínimo e worker encerrado.")
+            print("GUI OK: cópia/restauração DDC, ajustes manuais, Sabor OLED com curva, "
+                  "idempotência, padrão visual fechado, tamanho mínimo e worker encerrado.")
     finally:
         root.destroy()
 

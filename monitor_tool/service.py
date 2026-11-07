@@ -1,6 +1,6 @@
 """Regras compartilhadas por GUI e CLI; nenhuma escrita sem backup prévio."""
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import json
 import os
@@ -10,6 +10,7 @@ import threading
 import uuid
 
 from .models import FEATURES, MonitorError, Value
+from .looks import oled_ramp, parameters, ramps_match, STRENGTHS, validate_ramp
 
 _LOCK = threading.Lock()
 
@@ -33,10 +34,16 @@ class Plan:
     changes: list[Change]
     skipped: dict
     demo: bool
+    tone: dict | None = None
+    notes: list[str] = field(default_factory=list)
+
+    @property
+    def has_changes(self):
+        return bool(self.changes or self.tone)
 
     def public(self):
         return {"monitor": self.monitor, "changes": [asdict(c) for c in self.changes],
-                "skipped": self.skipped, "demo": self.demo}
+                "skipped": self.skipped, "demo": self.demo, "tone": self.tone, "notes": self.notes}
 
 
 def save_json(path, data):
@@ -68,17 +75,23 @@ def load_profile(path):
         if path.stat().st_size > 1_000_000:
             raise MonitorError("Backup excede o tamanho permitido.")
         data = json.loads(path.read_text(encoding="utf-8-sig"))
-        if (not isinstance(data, dict) or data.get("schema") != 1
+        if (not isinstance(data, dict) or type(data.get("schema")) is not int or data["schema"] not in (1, 2)
                 or type(data.get("demo")) is not bool
                 or not isinstance(data.get("monitor"), dict)
                 or not isinstance(data["monitor"].get("identity"), str)
                 or not isinstance(data["monitor"].get("id"), str)
-                or not isinstance(data.get("values"), dict) or not data["values"]):
+                or not isinstance(data.get("values"), dict)):
             raise MonitorError("Formato de backup inválido ou versão incompatível.")
         for name, value in data["values"].items():
             if name not in FEATURES or not isinstance(value, dict):
                 raise MonitorError("Backup contém controle não permitido.")
             Value(value.get("current"), value.get("maximum"))
+        if data["schema"] == 2:
+            validate_ramp(data.get("tone_curve"))
+        elif "tone_curve" in data:
+            raise MonitorError("Backup de curva SDR exige schema 2.")
+        if not data["values"] and "tone_curve" not in data:
+            raise MonitorError("Backup vazio: nenhum controle ou curva SDR.")
         return data
     except (OSError, ValueError, TypeError) as exc:
         raise MonitorError(f"Não foi possível ler o backup: {exc}") from exc
@@ -132,16 +145,23 @@ class Service:
             raise MonitorError(f"Monitor '{monitor_id}' ausente ou ambíguo. Atualize a lista.")
         return matches[0]
 
-    def snapshot(self, monitor):
+    def snapshot(self, monitor, include_tone=False):
         values, errors = {}, {}
         for name in FEATURES:
             try:
                 values[name] = asdict(self.backend.read(monitor, name))
             except MonitorError as exc:
                 errors[name] = str(exc)
-        return {"schema": 1, "created_at": datetime.now(timezone.utc).isoformat(),
-                "demo": self.backend.demo, "monitor": monitor.public(),
-                "values": values, "unavailable": errors}
+        profile = {"schema": 1, "created_at": datetime.now(timezone.utc).isoformat(),
+                   "demo": self.backend.demo, "monitor": monitor.public(),
+                   "values": values, "unavailable": errors}
+        if include_tone:
+            try:
+                profile["tone_curve"] = self.backend.read_tone(monitor)
+                profile["schema"] = 2
+            except MonitorError as exc:
+                profile["tone_unavailable"] = str(exc)
+        return profile
 
     def inspect(self):
         with self.session() as monitors:
@@ -152,8 +172,8 @@ class Service:
     def backup(self, monitor_id, path=None):
         with self.session() as monitors:
             monitor = self.find(monitors, monitor_id)
-            profile = self.snapshot(monitor)
-            if not profile["values"]:
+            profile = self.snapshot(monitor, include_tone=True)
+            if not profile["values"] and "tone_curve" not in profile:
                 raise MonitorError("Nenhum dos cinco controles pôde ser lido; backup não criado.")
             return save_json(path or self.new_backup_path(monitor.id), profile)
 
@@ -221,7 +241,47 @@ class Service:
                     raise MonitorError(f"Intervalo de {name} mudou. Confira o modo de imagem.")
                 if before.current != saved["current"]:
                     changes.append(Change(name, before.current, saved["current"], before.maximum))
-            return Plan(target.public(), changes, {}, self.backend.demo)
+            tone, notes = None, []
+            if "tone_curve" in profile:
+                before_tone = self.backend.read_tone(target)
+                if not ramps_match(before_tone, profile["tone_curve"], tolerance=0):
+                    tone = {"before": before_tone, "after": profile["tone_curve"],
+                            "label": "Restaurar curva SDR do backup"}
+            else:
+                notes.append("Este backup contém somente DDC/CI; não altera a curva de tons da GPU.")
+            return Plan(target.public(), changes, {}, self.backend.demo, tone, notes)
+
+    def plan_oled(self, target_id, panel, strength="balanced", tone_curve=False):
+        percent, _ = parameters(panel, strength)
+        with self.session() as monitors:
+            target = self.find(monitors, target_id)
+            self.check_target(target)
+            changes, skipped, tone = [], {}, None
+            try:
+                before = self.backend.read(target, "brightness")
+                # Não aumentar a luz de fundo que o usuário já deixou baixa.
+                after = min(before.current, max(1, (before.maximum * percent + 50) // 100))
+                if before.current != after:
+                    changes.append(Change("brightness", before.current, after, before.maximum))
+            except MonitorError as exc:
+                skipped["brightness"] = str(exc)
+                if not tone_curve:
+                    raise MonitorError("O perfil sem curva SDR exige leitura de brilho: " + str(exc)) from exc
+            notes = [f"Sabor OLED / {panel.upper()} / {STRENGTHS[strength]['label']}: "
+                     f"teto de brilho {percent}% (não aumenta brilho já menor). Contraste e RGB preservados.",
+                     "Perfil estético heurístico: não transforma o painel em OLED nem é calibração medida."]
+            if tone_curve:
+                before_tone = self.backend.read_tone(target)  # Falhar antes de qualquer escrita em HDR.
+                after_tone = oled_ramp(panel, strength)
+                if not ramps_match(before_tone, after_tone, tolerance=256):
+                    tone = {"before": before_tone, "after": after_tone,
+                            "label": f"Sabor OLED SDR / {panel.upper()} / {STRENGTHS[strength]['label']}"}
+                notes.append("A curva SDR substitui a curva GPU atual; backup inclui os 3 canais. "
+                             "Não reescreve ICC. Outros apps/Windows podem substituir a curva depois.")
+            else:
+                notes.append("Sem curva SDR: ajusta apenas a luz de fundo. Para meios-tons mais profundos, "
+                             "ative a opção de curva SDR (substitui a curva GPU atual).")
+            return Plan(target.public(), changes, skipped, self.backend.demo, tone, notes)
 
     def execute(self, plan):
         if plan.demo != self.backend.demo:
@@ -231,7 +291,7 @@ class Service:
             self.check_target(target)
             if target.identity != plan.monitor["identity"]:
                 raise MonitorError("Monitor mudou desde a prévia. Atualize a comparação.")
-            profile = self.snapshot(target)
+            profile = self.snapshot(target, include_tone=True)
             seen = set()
             for change in plan.changes:
                 if change.feature not in FEATURES or change.feature in seen:
@@ -242,7 +302,14 @@ class Service:
                     raise MonitorError("Valores mudaram desde a prévia. Gere uma nova comparação.")
                 if type(change.after) is not int or not 0 <= change.after <= change.maximum:
                     raise MonitorError("Plano contém valor fora do intervalo.")
-            if not plan.changes:
+            if plan.tone:
+                validate_ramp(plan.tone["before"])
+                validate_ramp(plan.tone["after"])
+                if "tone_curve" not in profile:
+                    raise MonitorError(profile.get("tone_unavailable", "Curva SDR indisponível."))
+                if not ramps_match(profile["tone_curve"], plan.tone["before"], tolerance=0):
+                    raise MonitorError("Curva SDR mudou desde a prévia. Prepare novamente.")
+            if not plan.has_changes:
                 return {"ok": True, "backup": None, "applied": [], "failed": {}}
             # Salvar e confirmar o fechamento do arquivo antes da primeira escrita DDC.
             backup = save_json(self.new_backup_path(target.id), profile)
@@ -269,6 +336,16 @@ class Service:
                     except Exception as exc:
                         failed[change.feature] = str(exc)
                         applied.remove(change.feature)
+            if plan.tone and not failed:
+                try:
+                    self.backend.write_tone(target, plan.tone["after"])
+                    actual = self.backend.read_tone(target)
+                    if not ramps_match(actual, plan.tone["after"]):
+                        raise MonitorError("Driver não confirmou a curva SDR. Pode haver bloqueio ou outro app de cor.")
+                    applied.append("tone_curve")
+                except Exception as exc:
+                    failed["tone_curve"] = str(exc)
+            intended = [c.feature for c in plan.changes] + (["tone_curve"] if plan.tone else [])
             return {"ok": not failed, "backup": str(backup), "applied": applied,
-                    "failed": failed, "not_attempted": [c.feature for c in plan.changes
-                    if c.feature not in applied and c.feature not in failed]}
+                    "failed": failed, "not_attempted": [name for name in intended
+                    if name not in applied and name not in failed]}

@@ -109,7 +109,7 @@ class ServiceTests(unittest.TestCase):
                  dict(data, values={"brightness": {"current": -1, "maximum": 100}}),
                  dict(data, values={"brightness": {"current": 200, "maximum": 100}}),
                  dict(data, values={"brightness": {"current": 0, "maximum": 0}}),
-                 dict(data, values={"brightness": []}), [], dict(data, values={})]
+                 dict(data, values={"brightness": []}), [], dict(data, values={}, schema=1)]
         for index, invalid in enumerate(cases):
             with self.subTest(invalid=invalid):
                 altered = self.folder / f"invalid-{index}.json"
