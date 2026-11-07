@@ -123,6 +123,7 @@ app
       "preview_match",
       "preview_set",
       "preview_visual",
+      "preview_preset",
       "preview_undo",
       "diagnostics",
       "apply",

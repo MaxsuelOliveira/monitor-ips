@@ -13,6 +13,13 @@ teste com uma alteração de hardware. Usar o centro do retângulo físico para 
 cada monitor para o display Electron; não associar janelas de teste como filhas da
 principal, pois o Windows pode colocá-las no mesmo monitor em tela cheia.
 
+`presets.py` é o catálogo único de modelos da GUI e CLI. Modelos preservam RGB,
+contraste e preset OSD; guardam também os valores preservados contra mudanças
+entre prévia e aplicação. Percentuais de brilho são DDC, não cd/m². Não alegar
+gamma medido, branco D65, gamut sRGB ou igualdade física com OLED. Manter curvas
+absolutas e tolerância de quantização coerente com `ramps_match`. Testar escrita
+em DEMO; leitura/`--dry-run` reais não comprovam qualidade óptica.
+
 ## Workflow global
 
 - Prefixar todo comando shell com `rtk`; política: `C:/Users/maxsu/.codex/RTK.md`.

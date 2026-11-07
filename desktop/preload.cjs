@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("monitor", {
   previewMatch: invoke("preview_match"),
   previewSet: invoke("preview_set"),
   previewVisual: invoke("preview_visual"),
+  previewPreset: invoke("preview_preset"),
   previewUndo: invoke("preview_undo"),
   diagnostics: invoke("diagnostics"),
   apply: invoke("apply"),

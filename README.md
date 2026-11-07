@@ -1,9 +1,10 @@
 # Monitor IPS
 
 Aplicativo Windows com **Electron + HTML/CSS** e backend Python local para
-aproximar as configurações do VA às do IPS. A janela principal agora tem três
-seções: **Ajustar aparência**, **Copiar ajustes** e **Backups**. O CLI continua independente
-de Node/Electron. O perfil OLED anterior não aparece no novo fluxo principal.
+ajustar a imagem de monitores IPS e VA. A janela tem configuração guiada de telas,
+**Modelos prontos**, controles individuais de brilho, contraste e cores, cópia de
+ajustes, comparação, backups e curva avançada. O CLI continua independente de
+Node/Electron; os comandos antigos foram preservados.
 
 ## Abrir
 
@@ -32,6 +33,54 @@ python monitor_ips.py --demo gui
 
 A janela Tkinter anterior continua em `python monitor_ips.py gui-tk`.
 Os comandos legados `compare`, `apply`, `pattern` e `oled` foram preservados.
+
+## Modelos prontos para IPS e VA
+
+Abra **Modelos prontos** e selecione no topo o monitor que receberá os ajustes.
+Para ajustar o IPS local, escolha **DISPLAY2 / VLK2730** como destino. Nesta tela,
+o IPS pode ser o destino mesmo que também esteja selecionado como referência;
+somente a cópia exige duas telas diferentes.
+
+| Modelo / ID CLI | Brilho IPS / VA | Curva SDR |
+| --- | --- | --- |
+| OLED equilibrado / `oled-balanced` | Teto 22% / 16% | Profundidade suave |
+| Cinema escuro / `cinema-dark` | Teto 16% / 12% | Profundidade mais forte |
+| Cores naturais / `natural` | Alvo 32% / 28% | Neutra |
+| Ambiente claro / `bright-room` | Alvo 55% / 45% | Neutra |
+
+Percentuais são da escala DDC, não luminância em cd/m². Um teto mantém brilho já
+menor; um alvo pode aumentar o brilho atual e isso aparece na prévia. **Usar brilho
+personalizado** substitui a sugestão por um alvo de 0 a 100%. Confira o tipo de
+painel e clique **Revisar modelo no destino**; a aplicação só ocorre após **Salvar
+backup e aplicar**. O modelo inicial selecionado é OLED equilibrado.
+
+Todos preservam e verificam contraste, RGB e modo de cor atuais. As curvas são
+absolutas, não acumulam o efeito e preservam códigos 0–8 e 240–255. A curva neutra
+substitui inclusive ajustes anteriores nos três canais; não equivale a uma
+calibração de cores. É possível desmarcar a curva e ajustar apenas o brilho.
+HDR/WCG e topologia incompatível bloqueiam a curva, sem fallback automático no CLI.
+O driver pode quantizar os valores; uma diferença de até 256/65535 é tolerada,
+como nas demais operações de curva, para evitar reaplicações desnecessárias.
+
+Não existe configuração universal que transforme IPS/VA em OLED. O contraste
+físico e o controle de luz por pixel são características do painel. Estes números
+são pontos de partida estéticos do aplicativo, não parâmetros certificados para
+seu exemplar. Gamma 2,2, D65 e luminância precisam de medição para serem confirmados.
+Pesquisa e fontes: [IMAGE-PRESETS-RESEARCH.md](documents/IMAGE-PRESETS-RESEARCH.md).
+Validação: [PRESETS-VALIDATION.md](documents/PRESETS-VALIDATION.md).
+
+```powershell
+python monitor_ips.py presets
+python monitor_ips.py presets --json
+python monitor_ips.py preset --monitor 0581ae7f4b073cc4 --panel ips --name oled-balanced --dry-run
+python monitor_ips.py preset --monitor 0581ae7f4b073cc4 --panel ips --name oled-balanced
+python monitor_ips.py preset --monitor ID_VA --panel va --name cinema-dark --brightness 15
+python monitor_ips.py preset --monitor ID_IPS --panel ips --name bright-room --no-tone --dry-run
+```
+
+Sem `--dry-run`, o CLI pede confirmação; `--yes` permite automação. Backups e
+restauração usam o fluxo descrito abaixo. Nenhum modelo é reaplicado automaticamente.
+O comando legado `oled` mantém seu comportamento anterior.
 
 ## Igualar o VA ao IPS
 

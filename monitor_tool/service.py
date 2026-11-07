@@ -383,6 +383,58 @@ class Service:
                     plan.expected_target["tone_curve"] = profile["tone_curve"]
             return plan
 
+    def plan_preset(self, target_id, preset_id, panel, tone_curve=True, brightness=None):
+        from .presets import get_preset, preset_ramp
+        preset = get_preset(preset_id, panel)
+        if type(tone_curve) is not bool:
+            raise MonitorError("A opção de curva SDR precisa ser booleana.")
+        if brightness is not None and (type(brightness) is not int or not 0 <= brightness <= 100):
+            raise MonitorError("Brilho personalizado deve ser inteiro de 0 a 100% da escala DDC.")
+        with self.session() as monitors:
+            target = self.find(monitors, target_id)
+            self.check_target(target)
+            profile = self.snapshot(target, include_color=True)
+            expected = {name: value.copy() for name, value in profile["values"].items()}
+            changes, skipped, tone = [], {}, None
+            percent = preset["brightness"][panel] if brightness is None else brightness
+            ceiling = brightness is None and preset["brightness_mode"] == "ceiling"
+            before = profile["values"].get("brightness")
+            if before:
+                after = (before["maximum"] * percent + 50) // 100
+                if ceiling:
+                    after = min(before["current"], after)
+                expected["brightness"] = {"current": after, "maximum": before["maximum"]}
+                if before["current"] != after:
+                    changes.append(Change("brightness", before["current"], after, before["maximum"]))
+            elif not tone_curve:
+                raise MonitorError("Sem curva SDR, o modelo exige controle de brilho disponível.")
+            else:
+                skipped["brightness"] = profile["unavailable"].get("brightness", "Indisponível.")
+            notes = [f"Modelo: {preset['name']} / {panel.upper()}. "
+                     f"{'Teto de' if ceiling else 'Alvo de'} brilho {percent}% da escala DDC; não é cd/m².",
+                     "Modelo estético ajustável, sem calibração medida. IPS/VA não se tornam idênticos a OLED.",
+                     "Contraste, ganhos RGB e modo de cor atuais serão preservados e verificados."]
+            desired = {"values": expected}
+            if "color_preset" in profile:
+                desired["color_preset"] = profile["color_preset"]["current"]
+            if tone_curve:
+                before_tone = self.backend.read_tone(target)
+                after_tone = preset_ramp(preset_id, panel)
+                equivalent = ramps_match(before_tone, after_tone, tolerance=256)
+                desired["tone_curve"] = before_tone if equivalent else after_tone
+                if not equivalent:
+                    tone = {"before": before_tone, "after": after_tone,
+                            "label": f"{preset['name']} / {panel.upper()} / curva SDR absoluta"}
+                notes.append("A curva SDR substitui a curva atual dos três canais; o backup permite restaurá-la. "
+                             "Sombras 0–8 e realces 240–255 preservados; sem corte de sombras. "
+                             "Não certifica gamma 2,2, D65 ou gamut sRGB e não altera ICC.")
+            else:
+                notes.append("Sem curva SDR: somente o brilho é ajustado; não aplica a aparência tonal do modelo.")
+            if before and expected["brightness"]["current"] > before["current"]:
+                notes.append("Este modelo aumenta o brilho atual. Confira o conforto visual antes de manter.")
+            return Plan(target.public(), changes, skipped, self.backend.demo, tone, notes,
+                        expected_target=desired)
+
     def plan_oled(self, target_id, panel, strength="balanced", tone_curve=False):
         percent, _ = parameters(panel, strength)
         with self.session() as monitors:

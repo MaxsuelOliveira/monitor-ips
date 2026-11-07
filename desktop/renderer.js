@@ -66,7 +66,9 @@ function lock() {
   for (const id of ["backup", "restore", "pattern"])
     byId(id).dataset.locked = String(!profile);
   byId("compare-pattern").dataset.locked = String(
-    !profile || !selected("source") || byId("source").value === byId("target").value,
+    !profile ||
+      !selected("source") ||
+      byId("source").value === byId("target").value,
   );
   byId("undo").dataset.locked = String(!profile?.can_undo);
   byId("manual-tone").dataset.locked = String(!profile?.tone_available);
@@ -359,11 +361,20 @@ async function compare() {
   }
   if (source.monitor.id === target.monitor.id && state.monitors.length === 1) {
     renderComparison();
-    notice("Uma tela conectada. Os ajustes individuais estão disponíveis; a cópia exige duas telas.");
+    notice(
+      "Uma tela conectada. Os ajustes individuais estão disponíveis; a cópia exige duas telas.",
+    );
     return;
   }
-  if (source.monitor.id === target.monitor.id)
-    throw new Error("Escolha monitores diferentes para referência e destino.");
+  if (source.monitor.id === target.monitor.id) {
+    renderComparison();
+    notice(
+      document.body.dataset.screen === "sync"
+        ? "Selecione duas telas diferentes para copiar ajustes. Modelos e ajustes individuais continuam disponíveis."
+        : "",
+    );
+    return;
+  }
   plan = await api.previewMatch({
     source: source.monitor.id,
     target: target.monitor.id,
@@ -452,7 +463,9 @@ function confirm(planTitle) {
       element("li", `${labels[key]}: indisponível, não será copiado.`),
     );
   byId("confirm-extra").textContent = plan.notes
-    .filter((note) => /Usuário|curva|sombras/i.test(note))
+    .filter(
+      (note) => previewKind === "preset" || /Usuário|curva|sombras/i.test(note),
+    )
     .join(" ");
   byId("confirm").returnValue = "";
   byId("confirm").showModal();

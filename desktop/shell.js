@@ -8,6 +8,7 @@
     return el;
   };
   const pages = {
+    presets: ["Modelos prontos", "Uma aparência para cada ambiente. Escolha o modelo e revise no destino."],
     brightness: ["Brilho", "Encontre uma intensidade confortável."],
     contrast: ["Contraste", "Equilibre os tons claros e escuros."],
     colors: ["Cores", "Ajuste o equilíbrio entre vermelho, verde e azul."],
@@ -24,7 +25,7 @@
   for (const key of controls) {
     const button = make("button", pages[key][0], "tab");
     const icon = make("img");
-    icon.src = "assets/icons/" + ({ brightness: "sun", contrast: "circle-half", colors: "palette", sync: "copy", compare: "display", backups: "archive", advanced: "gear" })[key] + ".svg";
+    icon.src = "assets/icons/" + ({ presets: "palette", brightness: "sun", contrast: "circle-half", colors: "palette", sync: "copy", compare: "display", backups: "archive", advanced: "gear" })[key] + ".svg";
     icon.alt = "";
     button.prepend(icon);
     button.type = "button";
@@ -126,7 +127,7 @@
     document.body.dataset.screen = key;
     document.body.classList.remove("onboarding");
     welcome.hidden = wizard.hidden = true;
-    for (const [name, view] of [["sync", $("sync-view")], ["backups", $("backups-view")], ["compare", compareView]]) view.hidden = name !== key;
+    for (const [name, view] of [["presets", $("presets-view")], ["sync", $("sync-view")], ["backups", $("backups-view")], ["compare", compareView]]) view.hidden = name !== key;
     $("manual-view").hidden = !["brightness", "contrast", "colors", "advanced"].includes(key);
     $("manual-form").dataset.function = key;
     $("page-title").textContent = pages[key][0];

@@ -28,6 +28,8 @@ class Bridge:
             except (OSError, ValueError):
                 pass
         data["roles"] = roles
+        from .presets import catalog
+        data["presets"] = catalog()
         data["backup_dir"] = str(self.service.backups.resolve())
         for profile in data["monitors"]:
             profile["tone_available"] = "tone_curve" in profile
@@ -57,6 +59,9 @@ class Bridge:
             return self.preview(self.service.plan_set(params["target"], params["values"]))
         if method == "preview_visual":
             return self.preview(self.service.plan_visual(params["target"], params.get("values", {}), params.get("tone")))
+        if method == "preview_preset":
+            return self.preview(self.service.plan_preset(params["target"], params["preset"], params["panel"],
+                                                        params.get("tone", True), params.get("brightness")))
         if method == "preview_undo":
             path = self.last_backups.get(params["target"])
             if not path:

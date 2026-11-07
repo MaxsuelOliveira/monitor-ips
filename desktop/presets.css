@@ -1,0 +1,147 @@
+/* 2 colunas no conteúdo existente, com gutter de 16 px e mesma borda externa. */
+.preset-intro {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0 0 24px;
+}
+.preset-catalog {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.preset-catalog legend {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.preset-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  border-radius: 16px;
+  padding: 22px;
+  cursor: pointer;
+  transition:
+    border-color 140ms,
+    background 140ms;
+}
+.preset-card:has(:checked) {
+  border-color: var(--accent);
+  background: #edf3ff;
+}
+.preset-card:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.preset-card input[type="radio"] {
+  appearance: none;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  padding: 0;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  background: transparent;
+}
+.preset-card input:checked {
+  border: 6px solid var(--accent);
+  background: white;
+}
+.preset-card input:disabled {
+  cursor: wait;
+}
+.preset-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.preset-card-content strong {
+  font-size: 18px;
+}
+.preset-environment {
+  font-size: 12px;
+  color: var(--muted);
+}
+.preset-description {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.preset-options {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 24px;
+  margin: 28px 0 20px;
+}
+.preset-options label {
+  font-size: 14px;
+}
+.preset-options .muted {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.preset-curve-option .check-label {
+  margin-bottom: 12px;
+}
+.preset-summary {
+  background: var(--surface);
+  padding: 18px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.preset-limit,
+.preset-research {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.preset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 24px;
+}
+.preset-actions span {
+  font-size: 12px;
+}
+.preset-research {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+.preset-research summary {
+  cursor: pointer;
+  color: var(--text);
+}
+#preset-brightness {
+  max-width: 440px;
+}
+#preset-brightness .value-input {
+  font-size: 30px;
+}
+@media (max-width: 1000px) {
+  .preset-options {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+@media (max-width: 850px) {
+  .preset-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preset-card {
+    transition: none;
+  }
+}

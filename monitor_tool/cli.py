@@ -5,6 +5,7 @@ import sys
 from .models import FEATURES, CONTROL_LABELS, MonitorError
 from .service import Service
 from .looks import STRENGTHS
+from .presets import PRESETS, catalog
 
 
 def parser():
@@ -14,6 +15,14 @@ def parser():
     sub = p.add_subparsers(dest="command")
     sub.add_parser("gui", help="Abre a janela Electron (padrão).")
     sub.add_parser("gui-tk", help="Abre a janela Tkinter anterior (compatibilidade).")
+    presets = sub.add_parser("presets", help="Lista os modelos prontos de imagem.")
+    presets.add_argument("--json", action="store_true")
+    preset = sub.add_parser("preset", help="Aplica um modelo estético no IPS ou VA, com backup.")
+    preset.add_argument("--monitor", required=True)
+    preset.add_argument("--panel", required=True, choices=["ips", "va"])
+    preset.add_argument("--name", required=True, choices=list(PRESETS))
+    preset.add_argument("--no-tone", action="store_true", help="Ajusta apenas o brilho; preserva a curva atual.")
+    preset.add_argument("--brightness", type=int, help="Substitui a sugestão por 0 a 100%% da escala DDC.")
     match = sub.add_parser("match", help="Iguala o destino à referência: valores nativos e curva SDR.")
     match.add_argument("--source", required=True)
     match.add_argument("--target", required=True)
@@ -60,7 +69,7 @@ def parser():
                       help="Também substitui a curva GPU SDR; exige HDR desligado e cria backup da curva.")
     pattern = sub.add_parser("pattern", help="Abre padrão visual de sombras, realces e gradientes na tela escolhida.")
     pattern.add_argument("--monitor", required=True)
-    for child in (fine, restore, oled, tune):
+    for child in (fine, restore, oled, tune, preset):
         child.add_argument("--yes", action="store_true")
         child.add_argument("--dry-run", action="store_true")
     return p
@@ -99,6 +108,16 @@ def print_plan(plan):
 def main(argv=None):
     args = parser().parse_args(argv)
     try:
+        if args.command == "presets":
+            if args.json:
+                print(json.dumps(catalog(), ensure_ascii=False, indent=2))
+            else:
+                for item in catalog():
+                    print(f"{item['id']} | {item['name']} | {item['description']}")
+                    print(f"  IPS {item['brightness']['ips']}% / VA {item['brightness']['va']}% "
+                          f"({'teto, preserva brilho menor' if item['brightness_mode'] == 'ceiling' else 'alvo de brilho'}). "
+                          "Curva opcional; contraste e RGB preservados.")
+            return 0
         if args.demo:
             from .demo import DemoBackend
             backend = DemoBackend()
@@ -160,6 +179,8 @@ def main(argv=None):
             plan = service.plan_visual(args.monitor, values, tone)
         elif command == "oled":
             plan = service.plan_oled(args.monitor, args.panel, args.strength, args.tone_curve)
+        elif command == "preset":
+            plan = service.plan_preset(args.monitor, args.name, args.panel, not args.no_tone, args.brightness)
         else:
             plan = service.plan_restore(args.monitor, args.file)
         print_plan(plan)

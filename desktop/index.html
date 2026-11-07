@@ -11,9 +11,11 @@
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="studio.css" />
     <link rel="stylesheet" href="simple.css" />
+    <link rel="stylesheet" href="presets.css" />
     <script src="controls.js" defer></script>
     <script src="renderer.js" defer></script>
     <script src="shell.js" defer></script>
+    <script src="presets.js" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -52,6 +54,69 @@
           >Atualizar
         </button>
       </div>
+      <section
+        id="presets-view"
+        class="view"
+        hidden
+        aria-label="Modelos de imagem"
+      >
+        <form id="preset-form">
+          <div class="preset-actions">
+            <button id="preset-review" type="submit" class="primary">
+              Revisar modelo no destino</button
+            ><span class="muted">Backup automático antes de aplicar.</span>
+          </div>
+          <fieldset class="preset-catalog">
+            <legend>Modelos prontos</legend>
+            <div id="preset-cards" class="preset-grid"></div>
+          </fieldset>
+          <div class="preset-options">
+            <div>
+              <label for="preset-panel">Tipo do painel de destino</label>
+              <select id="preset-panel">
+                <option value="ips">IPS</option>
+                <option value="va">VA</option>
+              </select>
+              <p id="preset-panel-hint" class="muted"></p>
+            </div>
+            <div class="preset-curve-option">
+              <label class="check-label"
+                ><input id="preset-tone" type="checkbox" checked /> Aplicar
+                também a curva SDR do modelo</label
+              >
+              <p id="preset-tone-hint" class="muted">
+                Substitui a curva atual. Ela será incluída no backup.
+              </p>
+              <label class="check-label"
+                ><input id="preset-custom" type="checkbox" /> Usar brilho
+                personalizado</label
+              >
+            </div>
+          </div>
+          <div id="preset-brightness" hidden></div>
+          <p id="preset-summary" class="preset-summary" role="status"></p>
+          <p class="preset-limit">
+            Inspiração OLED: melhora a aparência tonal, mas não altera o preto
+            físico do IPS ou VA. Não é calibração medida nem garante gamma 2,2
+            ou branco D65.
+          </p>
+        </form>
+        <details class="preset-research">
+          <summary>Como os modelos foram definidos</summary>
+          <p>
+            Curvas suaves e absolutas, sem corte de sombras ou aumento de RGB. A
+            EIZO recomenda adequar o brilho ao ambiente; gamma 2,2 e branco D65
+            são referências que exigem medição para certificar. Os percentuais
+            destes modelos são pontos de partida do aplicativo, não
+            configurações publicadas pelo fabricante do seu monitor.
+          </p>
+          <p>
+            Referências: EIZO — Monitor adjustment e Understanding Monitor
+            Gamma; LG — Screen Technology Explained. Links e parâmetros
+            completos no README e em documents/IMAGE-PRESETS-RESEARCH.md.
+          </p>
+        </details>
+      </section>
       <section class="pair" aria-label="Origem e destino">
         <article class="monitor-panel reference">
           <div class="panel-heading">
@@ -182,7 +247,12 @@
                 <h2>Luz e equilíbrio</h2>
                 <p class="muted">Deslize, digite ou use os botões de ajuste.</p>
               </div>
-              <div class="section-controls"><span id="draft-status" class="draft-status">Valores lidos</span><button class="primary" type="submit">Revisar ajustes <span aria-hidden="true">→</span></button></div>
+              <div class="section-controls">
+                <span id="draft-status" class="draft-status">Valores lidos</span
+                ><button class="primary" type="submit">
+                  Revisar ajustes <span aria-hidden="true">→</span>
+                </button>
+              </div>
             </div>
             <div id="manual-fields" class="manual-grid"></div>
             <details id="tone-options" class="tone-options">

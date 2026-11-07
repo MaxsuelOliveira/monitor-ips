@@ -1,7 +1,8 @@
-# Pesquisa e proposta de modelos de imagem
+# Pesquisa e modelos de imagem
 
-Consulta em 07/11/2026. Proposta em revisão; os modelos abaixo ainda não foram
-implementados ou aplicados.
+Consulta em 07/11/2026. Os quatro modelos foram implementados na interface e no
+CLI, com aplicação e restauração validadas em DEMO. Prévia real validada somente
+leitura; nenhum modelo novo foi aplicado ao hardware nesta implementação.
 
 ## Resultado da pesquisa
 
@@ -24,10 +25,10 @@ Fontes primárias:
 
 Não foi localizado manual oficial suficiente para definir calibração específica
 pelos identificadores locais VLK2730 e LHCFFFF. Não inferir marca/modelo comercial
-nem copiar ICC, RGB ou saturação de outro exemplar. Os perfis serão estéticos e
-deverão informar seus parâmetros como escolhas do aplicativo, não do fabricante.
+nem copiar ICC, RGB ou saturação de outro exemplar. Os perfis são estéticos e
+informam seus parâmetros como escolhas do aplicativo, não do fabricante.
 
-## Conjunto proposto
+## Conjunto implementado
 
 | Modelo | Uso | Estratégia |
 | --- | --- | --- |
@@ -36,12 +37,12 @@ deverão informar seus parâmetros como escolhas do aplicativo, não do fabrican
 | Cores naturais | Conteúdo SDR e uso diário | Curva neutra, preservando contraste e ganhos RGB existentes |
 | Ambiente claro | Sala iluminada | Mais luz de fundo com curva neutra, sem estourar os canais RGB |
 
-O destaque sugerido é OLED equilibrado. Os quatro modelos devem funcionar em
+O destaque inicial é OLED equilibrado. Os quatro modelos funcionam em
 IPS e VA, com seleção explícita de tela e tipo de painel. A seleção não aplica
-automaticamente. Prévia deve mostrar alterações, controles preservados e avisar
+automaticamente. A prévia mostra alterações, controles preservados e avisa
 quando uma curva absoluta substituir a curva atual.
 
-## Integração prevista
+## Critérios da implementação
 
 - Catálogo único no backend Python, reutilizado pela interface e pelo CLI.
 - Reutilizar o serviço, plano por token, backup, verificação e restauração atuais.
