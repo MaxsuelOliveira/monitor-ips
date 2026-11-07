@@ -86,7 +86,7 @@ button:hover:not(:disabled) { transform: none; }
 .control-card.compact .value-input { font-size: 32px; width: 70px; }
 .control-card.compact .control-description { font-size: 13px; }
 .tone-options { background: transparent; padding: 0; margin: 0; color: var(--text); }
-.tone-options > summary { display: none; }
+.tone-options > .tone-heading { display: none; }
 .tone-grid .control-card { background: #edf2f8; padding: 20px; border-radius: 16px; }
 .tone-grid .value-input { font-size: 30px; width: 100px; }
 .tone-options .check-label, .check-label { font-size: 14px; }

@@ -440,11 +440,11 @@ button:active:not(:disabled) {
   border-radius: 20px;
   color: #ddd;
 }
-.tone-options summary {
+.tone-options .tone-heading {
   font-size: 13px;
   font-weight: 600;
 }
-.tone-options summary span {
+.tone-options .tone-heading span {
   float: right;
   font-size: 10px;
   font-weight: 400;
@@ -866,7 +866,7 @@ dialog[open] {
   .tone-grid {
     grid-template-columns: 1fr;
   }
-  .tone-options summary span {
+  .tone-options .tone-heading span {
     float: none;
     display: block;
     margin: 5px 0 0;

@@ -9,7 +9,7 @@
     "demo": "electron . --demo",
     "prepare:desktop": "install-electron",
     "test": "node --test tests/desktop.test.cjs",
-    "check": "node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/controls.js && node --check desktop/renderer.js && node --check desktop/pattern.js && node --check desktop/shell.js && node --check desktop/presets.js"
+    "check": "node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/controls.js && node --check desktop/renderer.js && node --check desktop/pattern.js && node --check desktop/shell.js && node --check desktop/presets.js && node --check desktop/disclosures.js"
   },
   "devDependencies": {
     "electron": "45.2.3"

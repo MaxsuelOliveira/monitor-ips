@@ -1,5 +1,15 @@
 # Validação do layout claro — 07/11/2026
 
+## Atualização: expansores próprios
+
+- Eliminados os cinco pares de tags de expansão nativa. Explicações dos modelos, opções de cor, instruções de comparação e histórico usam `disclosures.js`/`disclosures.css`; curva SDR usa seção comum na tela Avançado.
+- Botão nativo com `type="button"`, `aria-expanded`, `aria-controls`, região identificada e visibilidade por `hidden`. Clique, Enter e Espaço verificados em Electron DEMO; conteúdo fechado sai da árvore de acessibilidade.
+- Histórico vazio apresenta mensagem; ao criar um backup DEMO, a mensagem desapareceu, o contador passou a 1 e o registro apareceu.
+- Verificados o seletor do modo de cor expandido e os controles SDR na tela Avançado.
+- Capturas locais: `output/disclosures-desktop.png` (1180 × 830) e `output/disclosures-mobile.png` (390 × 844). Sem overflow horizontal da página no viewport menor (scrollWidth 375).
+- Busca estática e DOM renderizado: zero elementos HTML nativos de expansão. Agent Browser `errors`: vazio. `npm test`, `npm run check` e `git diff --check` aprovados.
+- Regra registrada em `AGENTS.md`. Nenhum monitor real foi alterado.
+
 final result: passed
 
 ## Referência e evidências

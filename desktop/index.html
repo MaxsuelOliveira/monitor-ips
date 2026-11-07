@@ -12,7 +12,9 @@
     <link rel="stylesheet" href="studio.css" />
     <link rel="stylesheet" href="simple.css" />
     <link rel="stylesheet" href="presets.css" />
+    <link rel="stylesheet" href="disclosures.css" />
     <script src="controls.js" defer></script>
+    <script src="disclosures.js" defer></script>
     <script src="renderer.js" defer></script>
     <script src="shell.js" defer></script>
     <script src="presets.js" defer></script>
@@ -101,9 +103,15 @@
             ou branco D65.
           </p>
         </form>
-        <details class="preset-research">
-          <summary>Como os modelos foram definidos</summary>
-          <p>
+        <section class="disclosure preset-research">
+          <h3 class="disclosure-heading">
+            <button type="button" class="disclosure-trigger" id="research-trigger" aria-expanded="false" aria-controls="research-content">
+              <span class="disclosure-label">Como os modelos foram definidos</span>
+              <span class="disclosure-action" aria-hidden="true">Mostrar</span>
+            </button>
+          </h3>
+          <div id="research-content" class="disclosure-content" role="region" aria-labelledby="research-trigger" hidden>
+            <p>
             Curvas suaves e absolutas, sem corte de sombras ou aumento de RGB. A
             EIZO recomenda adequar o brilho ao ambiente; gamma 2,2 e branco D65
             são referências que exigem medição para certificar. Os percentuais
@@ -115,7 +123,8 @@
             Gamma; LG — Screen Technology Explained. Links e parâmetros
             completos no README e em documents/IMAGE-PRESETS-RESEARCH.md.
           </p>
-        </details>
+          </div>
+        </section>
       </section>
       <section class="pair" aria-label="Origem e destino">
         <article class="monitor-panel reference">
@@ -203,9 +212,15 @@
             </select></label
           >
         </div>
-        <details class="color-options">
-          <summary>Opções do modo de cor</summary>
-          <label class="mode-label" for="color-mode"
+        <section class="disclosure color-options">
+          <h3 class="disclosure-heading">
+            <button type="button" class="disclosure-trigger" id="color-trigger" aria-expanded="false" aria-controls="color-content">
+              <span class="disclosure-label">Opções do modo de cor</span>
+              <span class="disclosure-action" aria-hidden="true">Mostrar</span>
+            </button>
+          </h3>
+          <div id="color-content" class="disclosure-content" role="region" aria-labelledby="color-trigger" hidden>
+            <label class="mode-label" for="color-mode"
             >Modo do destino
             <select id="color-mode">
               <option value="auto">RGB editável, automático</option>
@@ -218,7 +233,8 @@
             Alguns presets bloqueiam RGB. O automático usa um modo Usuário
             anunciado pelo monitor para copiar os ganhos do IPS.
           </p>
-        </details>
+          </div>
+        </section>
         <div class="action-bar">
           <div>
             <strong id="action-title"
@@ -255,10 +271,8 @@
               </div>
             </div>
             <div id="manual-fields" class="manual-grid"></div>
-            <details id="tone-options" class="tone-options">
-              <summary>
-                Meios-tons e sombras <span>Avançado · SDR</span>
-              </summary>
+            <section id="tone-options" class="tone-options">
+              <h3 class="tone-heading">Meios-tons e sombras <span>Avançado · SDR</span></h3>
               <label class="check-label"
                 ><input id="manual-tone" type="checkbox" /><span
                   >Ajustar a curva de tons do destino<small
@@ -272,7 +286,7 @@
                 Cortar sombras pode esconder detalhes. O valor digital zero não
                 mede nem reduz a luz preta emitida pelo painel.
               </p>
-            </details>
+            </section>
             <div class="manual-note">
               <div>
                 <strong>Experimente com um ponto de retorno.</strong>
@@ -314,9 +328,15 @@
             <button id="diagnose" type="button" class="text-button">
               Verificar faixa RGB
             </button>
-            <details class="guide-steps">
-              <summary>Como comparar</summary>
-              <ol>
+            <section class="disclosure guide-steps">
+          <h3 class="disclosure-heading">
+            <button type="button" class="disclosure-trigger" id="guide-trigger" aria-expanded="false" aria-controls="guide-content">
+              <span class="disclosure-label">Como comparar</span>
+              <span class="disclosure-action" aria-hidden="true">Mostrar</span>
+            </button>
+          </h3>
+          <div id="guide-content" class="disclosure-content" role="region" aria-labelledby="guide-trigger" hidden>
+            <ol>
                 <li>Olhe de frente e mantenha a mesma luz ambiente.</li>
                 <li>
                   No teste, compare o fundo 0 e os degraus 8, 16 e 32. Espaço
@@ -331,7 +351,8 @@
                   uma correção do preto físico.
                 </li>
               </ol>
-            </details>
+          </div>
+        </section>
             <div class="guide-tools">
               <button id="pattern" type="button" class="secondary">
                 Teste de sombras e realces</button
@@ -391,12 +412,18 @@
         aria-live="polite"
         hidden
       ></div>
-      <details id="history">
-        <summary>
-          Histórico desta sessão <span id="history-count">0</span>
-        </summary>
-        <ol id="history-list"></ol>
-      </details>
+      <section id="history" class="disclosure">
+          <h3 class="disclosure-heading">
+            <button type="button" class="disclosure-trigger" id="history-trigger" aria-expanded="false" aria-controls="history-content">
+              <span class="disclosure-label">Histórico desta sessão <span id="history-count">0</span></span>
+              <span class="disclosure-action" aria-hidden="true">Mostrar</span>
+            </button>
+          </h3>
+          <div id="history-content" class="disclosure-content" role="region" aria-labelledby="history-trigger" hidden>
+            <p data-disclosure-empty>Nenhuma atividade registrada nesta sessão.</p>
+            <ol id="history-list" data-disclosure-list></ol>
+          </div>
+        </section>
       <footer>
         <span>Local no seu computador</span
         ><span>DDC/CI + curva SDR · Backup antes de aplicar</span>

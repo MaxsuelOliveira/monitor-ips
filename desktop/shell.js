@@ -58,7 +58,6 @@
   $("manual-view").after(compareView);
   $("backups-view").append(document.querySelector(".undo-strip"));
   const tone = $("tone-options");
-  tone.open = true;
   const manualHeading = document.querySelector("#manual-form .section-heading");
   manualHeading.querySelector("h2").textContent = "Ajuste do monitor";
   const submit = manualHeading.querySelector("button[type=submit]");

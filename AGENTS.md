@@ -36,6 +36,8 @@ em DEMO; leitura/`--dry-run` reais não comprovam qualidade óptica.
 
 ## Contratos
 
+- Não usar os elementos HTML `details` e `summary` neste projeto. Conteúdos recolhíveis usam o componente compartilhado `disclosures.js`/`disclosures.css`, com botão nativo, `aria-expanded`, `aria-controls` e painel com `hidden`.
+
 - Allowlist: brilho, contraste, ganhos R/G/B. Não aceitar códigos VCP arbitrários,
   reset de fábrica, energia ou entrada. O único controle categórico de escrita é
   modo de cor 0x14: consultar capacidades e aceitar somente presets anunciados.
