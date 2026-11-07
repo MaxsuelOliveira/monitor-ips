@@ -63,6 +63,11 @@ function notice(text, error = false) {
 }
 function lock() {
   const profile = selected("target");
+  for (const id of ["backup", "restore", "pattern"])
+    byId(id).dataset.locked = String(!profile);
+  byId("compare-pattern").dataset.locked = String(
+    !profile || !selected("source") || byId("source").value === byId("target").value,
+  );
   byId("undo").dataset.locked = String(!profile?.can_undo);
   byId("manual-tone").dataset.locked = String(!profile?.tone_available);
   document
@@ -350,6 +355,11 @@ async function compare() {
     target = selected("target");
   if (!source || !target) {
     renderComparison();
+    return;
+  }
+  if (source.monitor.id === target.monitor.id && state.monitors.length === 1) {
+    renderComparison();
+    notice("Uma tela conectada. Os ajustes individuais estão disponíveis; a cópia exige duas telas.");
     return;
   }
   if (source.monitor.id === target.monitor.id)
