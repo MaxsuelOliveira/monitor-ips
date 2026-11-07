@@ -7,7 +7,7 @@ de Node/Electron. O perfil OLED anterior não aparece no novo fluxo principal.
 
 ## Abrir
 
-Dê dois cliques em **abrir.cmd** na pasta `F:\Jobs\SaaS\monitor-ips`.
+Dê dois cliques em **abrir_monito.cmd** (ou **abrir.cmd**) na pasta `F:\Jobs\SaaS\monitor-ips`.
 Feche uma janela Tkinter antiga e abra pelo atalho para carregar a interface nova.
 O Electron já foi instalado e validado nesta máquina.
 
